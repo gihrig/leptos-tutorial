@@ -1,9 +1,17 @@
-/** 3.3a Components and Props - Component Props */
+/** 3.3b Components and Props - Reactive and Static Props */
 use leptos::*;
 
-// In Leptos, you define props by giving additional
-// arguments (e.g. `progress`) to the component function.
-// Components use PascalCase
+// You’ll notice that throughout this example, `progress`
+// takes a reactive ReadSignal<i32>, and not a plain i32.
+// This is very important.
+
+// Component props have no special meaning attached to them.
+// A component is simply a function that runs once to set up
+// the user interface. The only way to tell the interface to
+// respond to changing is to pass it a signal type. So if you
+// have a component property that will change over time, like
+// our progress, it should be a signal.
+
 #[component]
 fn ProgressBar(cx: Scope, progress: ReadSignal<i32>) -> impl IntoView {
     view! { cx,
