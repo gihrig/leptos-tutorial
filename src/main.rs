@@ -1,26 +1,37 @@
-/** 3.3b Components and Props - Reactive and Static Props */
+/** 3.3c Components and Props - Optional Props */
 use leptos::*;
 
-// You’ll notice that throughout this example, `progress`
-// takes a reactive ReadSignal<i32>, and not a plain i32.
-// This is very important.
-
-// Component props have no special meaning attached to them.
-// A component is simply a function that runs once to set up
-// the user interface. The only way to tell the interface to
-// respond to changing is to pass it a signal type. So if you
-// have a component property that will change over time, like
-// our progress, it should be a signal.
+// Previously the max setting was hard-coded. Let’s take
+// that as a prop too. But let’s add a catch: let’s make
+// this prop optional by annotating the particular
+// argument to the component function with
+// #[prop(optional)].
 
 #[component]
-fn ProgressBar(cx: Scope, progress: ReadSignal<i32>) -> impl IntoView {
+fn ProgressBar(
+    cx: Scope,
+    // mark this prop optional
+    // you can specify it or not when you use <ProgressBar/>
+    #[prop(optional)] max: u16,
+    progress: ReadSignal<i32>,
+) -> impl IntoView {
     view! { cx,
       <progress
-        max="50"
+        max=max
         value=progress
       />
     }
 }
+
+// Now, we can use <ProgressBar max=50 value=count/>, or we
+// can omit max to use the default value (i.e.,
+// <ProgressBar value=count/>). The default value on an
+// optional is its Default::default() value, which for a u16
+// is going to be 0. In the case of a progress bar, a max
+// value of 0 is not very useful.
+
+// In the next section we'll give it a particular default
+// value instead.
 
 #[component]
 fn App(cx: Scope) -> impl IntoView {
