@@ -1,90 +1,66 @@
-/** 3.3g Components and Props - Optional Generic Props */
+/** 3.3h Components and Props - Documenting Components */
 use leptos::*;
 
-// Note that you can’t specify optional generic props for
-// a component. Let’s see what would happen if you try:
+// This is one of the least essential but most important
+// sections of this book. It’s not strictly necessary to
+// document your components and their props. It may be very
+// important, depending on the size of your team and your app.
+// But it’s very easy, and bears immediate fruit.
 
-/*
-  #[component]
-  fn ProgressBar<F: Fn() -> i32 + 'static>(
-      cx: Scope,
-      #[prop(optional)] progress: Option<F>,
-  ) -> impl IntoView {
-      progress.map(|progress| {
-          view! { cx,
-              <progress
-                  max=100
-                  value=progress
-              />
-          }
-      })
-  }
+// To document a component and its props, you can simply add
+// doc comments on the component function, and each one of
+// the props:
 
-  #[component]
-  pub fn App(cx: Scope) -> impl IntoView {
-      view! { cx,
-          <ProgressBar/>
-      }
-}
-*/
-
-// Rust helpfully gives the error
-
-// xx |         <ProgressBar/>
-//    |          ^^^^^^^^^^^ cannot infer type of the type parameter `F` declared on the function `ProgressBar`
-//    |
-// help: consider specifying the generic argument
-//    |
-// xx |         <ProgressBar::<F>/>
-//    |                     +++++
-
-// There are just two problems:
-
-// Leptos’s view macro doesn’t support specifying a generic
-// on a component with this turbofish syntax.
-
-// Even if you could, specifying the correct type here is not
-// possible; closures and functions in general are un-nameable
-// types. The compiler can display them with a shorthand, but
-// you can’t specify them.
-
-// However, you can get around this by providing a concrete
-// type using Box<dyn _> or &dyn _:
-
-// >>> This example doesn't do anything - What's the point ??? <<<
-
+/// Display a progress bar.
 #[component]
 fn ProgressBar(
+    /// Leptos components require a `cx` scope.
     cx: Scope,
-    #[prop(optional)] progress: Option<Box<dyn Fn() -> i32>>,
+    /// The maximum value for the progress bar.
+    #[prop(default = 100)]
+    max: u16,
+    /// The current progress toward the max value.
+    #[prop(into)]
+    progress: Signal<i32>,
 ) -> impl IntoView {
-    progress.map(|progress| {
-        view! { cx,
-            <progress
-                max=100
-                value=progress
-            />
-        }
-    })
-}
-
-#[component]
-pub fn App(cx: Scope) -> impl IntoView {
     view! { cx,
-        <ProgressBar/>
+        <progress
+            max=max
+            value=progress
+        />
     }
 }
 
-// Because the Rust compiler now knows the concrete type of
-// the prop, and therefore its size in memory even in the
-// None case (as above), this compiles fine.
+#[component]
+fn App(cx: Scope) -> impl IntoView {
+    let (count, set_count) = create_signal(cx, 0);
+    let double_count = move || count() * 2;
 
-// In this particular case, &dyn Fn() -> i32 will cause
-// lifetime issues,
+    view! { cx,
+        <button on:click=move |_| { set_count.update(|n| *n += 1); }>
+            "Click me"
+        </button>
+        <br />
+        <br />
+        // .into() converts `ReadSignal` to `Signal`
+        <ProgressBar progress=count/>
+        <br />
+        // use `Signal::derive()` to wrap a derived signal
+        <ProgressBar progress=Signal::derive(cx, double_count)/>
+    }
+}
 
-// >>> Is that why the example does nothing? <<<
+// That’s all you need to do. These behave like ordinary Rust
+// doc comments, except that you can document individual
+// component props, which can’t be done with Rust function
+// arguments.
 
-// but in other cases, it may be a possibility.
+// This will automatically generate documentation for your
+// component, its Props type, and each of the fields used to
+// add props. It can be a little hard to understand how
+// powerful this is until you hover over the component name
+// or props and see the power of the #[component] macro
+// combined with rust-analyzer here.
 
 fn main() {
     leptos::mount_to_body(|cx| view! { cx, <App/> })
