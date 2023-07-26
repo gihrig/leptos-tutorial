@@ -1,3 +1,4 @@
+/** 3.2a Dynamic Attributes - Dynamic Classes */
 use leptos::*;
 
 // The #[component] macro marks a function as a reusable component
@@ -15,6 +16,13 @@ fn App(cx: Scope) -> impl IntoView {
     // it uses an HTML-like format that can accept certain Rust values
     view! { cx,
         <button
+            class:red-20=move || count() % 2 == 1
+            // Docs say tuple syntax required when class name contains
+            // dashes, number, etc., e.g.
+            // class=("red-20", move || count() % 2 == 1)
+            // This does not seem to be true as of Rust 1.73 nightly
+            // with Leptos 1.4.6
+
             // on:click will run whenever the `click` event fires
             // every event handler is defined as `on:{eventname}`
 
@@ -26,27 +34,9 @@ fn App(cx: Scope) -> impl IntoView {
         >
             // text nodes in RSX should be wrapped in quotes,
             // like a normal Rust string
-            "Click me"
+            "Click me: "
+            {move || count()}
         </button>
-        <p>
-            <strong>"Reactive: "</strong>
-            // you can insert Rust expressions as values in the DOM
-            // by wrapping them in curly braces
-            // if you pass in a function, it will reactively update
-            {move || count.get()}
-        </p>
-        <p>
-            <strong>"Reactive shorthand: "</strong>
-            // signals are functions, so we can remove the wrapping closure
-            // Rust nightly required as of v1.71.
-            {count}
-        </p>
-        <p>
-            <strong>"Not reactive: "</strong>
-            // NOTE: if you write {count()}, this will *not* be reactive
-            // it simply gets the value of count once
-            {count()}
-        </p>
     }
 }
 
