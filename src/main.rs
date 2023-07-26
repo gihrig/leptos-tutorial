@@ -1,5 +1,19 @@
-/** 3.2c Dynamic Attributes - Dynamic Attributes */
+/** 3.2d Dynamic Attributes - Derived Signals */
 use leptos::*;
+
+/**
+* Derived signals let you create reactive computed
+* values that can be used in multiple places in your
+* application with minimal overhead.
+
+   Note: Using a derived signal like this means that
+   the calculation runs once per signal change per
+   place we access double_count; in other words,
+   twice. This is a very cheap calculation, so that’s
+   fine. We’ll look at memos in a later chapter, which
+   are designed to solve this problem for expensive
+   calculations.
+*/
 
 // The #[component] macro marks a function as a reusable component
 // Components are the building blocks of your user interface
@@ -12,10 +26,17 @@ fn App(cx: Scope) -> impl IntoView {
     // we'll talk more about them later
     let (count, set_count) = create_signal(cx, 0);
 
+    // a "derived signal" is a function that accesses other signals
+    // we can use this to create reactive values that depend on the
+    // values of one or more other signals
+    let double_count = move || count() * 2;
+
     // the `view` macro is how we define the user interface
     // it uses an HTML-like format that can accept certain Rust values
     view! { cx,
         <button
+            // the class: syntax reactively updates a single class
+            // here, we'll set the `red` class when `count` is odd
             class:red-20=move || count() % 2 == 1
             // Docs say tuple syntax required when class name contains
             // dashes, number, etc., e.g.
@@ -37,14 +58,35 @@ fn App(cx: Scope) -> impl IntoView {
             "Click me: "
             {move || count()}
         </button>
+        // NOTE: self-closing tags like <br> need an explicit `/`
+        <br/>
+        <br/>
 
-        // 3.2c Dynamic Attributes
+        // 3.2d Derived Signals
         <progress
             max="50"
             // signals are functions, this is equal to
             // `move || count.get()`
             value=count
         />
+        <br/>
+
+        <progress
+            max="50"
+            // derived signals are functions, so they can also
+            // reactively update the DOM
+            // First use of `double_count
+            value=double_count
+        />
+        <p>
+            "Count: "
+            {count}
+        </p>
+        <p>
+            "Double Count: "
+            // Second use of `double_count
+            {double_count}
+        </p>
     }
 }
 
