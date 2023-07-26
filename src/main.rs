@@ -1,56 +1,90 @@
-/** 3.3f Components and Props - into Props */
+/** 3.3g Components and Props - Optional Generic Props */
 use leptos::*;
 
-// There’s one more way we could implement this, and it
-// would be to use #[prop(into)]. This attribute
-// automatically calls .into() on the values you pass as
-// props, which allows you to easily pass props with
-// different values.
+// Note that you can’t specify optional generic props for
+// a component. Let’s see what would happen if you try:
 
-// In this case, it’s helpful to know about the Signal
-// type. Signal is an enumerated type that represents
-// any kind of readable reactive signal. It can be useful
-// when defining APIs for components you’ll want to reuse
-// while passing different sorts of signals.
-// The MaybeSignal type is useful when you want to be able
-// to take either a static or reactive value.
+/*
+  #[component]
+  fn ProgressBar<F: Fn() -> i32 + 'static>(
+      cx: Scope,
+      #[prop(optional)] progress: Option<F>,
+  ) -> impl IntoView {
+      progress.map(|progress| {
+          view! { cx,
+              <progress
+                  max=100
+                  value=progress
+              />
+          }
+      })
+  }
+
+  #[component]
+  pub fn App(cx: Scope) -> impl IntoView {
+      view! { cx,
+          <ProgressBar/>
+      }
+}
+*/
+
+// Rust helpfully gives the error
+
+// xx |         <ProgressBar/>
+//    |          ^^^^^^^^^^^ cannot infer type of the type parameter `F` declared on the function `ProgressBar`
+//    |
+// help: consider specifying the generic argument
+//    |
+// xx |         <ProgressBar::<F>/>
+//    |                     +++++
+
+// There are just two problems:
+
+// Leptos’s view macro doesn’t support specifying a generic
+// on a component with this turbofish syntax.
+
+// Even if you could, specifying the correct type here is not
+// possible; closures and functions in general are un-nameable
+// types. The compiler can display them with a shorthand, but
+// you can’t specify them.
+
+// However, you can get around this by providing a concrete
+// type using Box<dyn _> or &dyn _:
+
+// >>> This example doesn't do anything - What's the point ??? <<<
 
 #[component]
 fn ProgressBar(
     cx: Scope,
-    #[prop(default = 100)] max: u16,
-    #[prop(into)] progress: Signal<i32>,
+    #[prop(optional)] progress: Option<Box<dyn Fn() -> i32>>,
 ) -> impl IntoView {
-    view! { cx,
-      <progress
-        max=max
-        value=progress
-      />
-    }
+    progress.map(|progress| {
+        view! { cx,
+            <progress
+                max=100
+                value=progress
+            />
+        }
+    })
 }
 
 #[component]
-fn App(cx: Scope) -> impl IntoView {
-    let (count, set_count) = create_signal(cx, 0);
-    let double_count = move || count() * 2;
-
+pub fn App(cx: Scope) -> impl IntoView {
     view! { cx,
-        <button
-            on:click=move |_| {
-                set_count.update(|n| *n += 1);
-            }
-        >
-          "Click me"
-        </button>
-        <br />
-        <br />
-        // .into() converts `ReadSignal` to `Signal`
-        <ProgressBar progress=count/>
-        <br />
-        // use `Signal::derive()` to wrap a derived signal
-        <ProgressBar progress=Signal::derive(cx, double_count)/>
+        <ProgressBar/>
     }
 }
+
+// Because the Rust compiler now knows the concrete type of
+// the prop, and therefore its size in memory even in the
+// None case (as above), this compiles fine.
+
+// In this particular case, &dyn Fn() -> i32 will cause
+// lifetime issues,
+
+// >>> Is that why the example does nothing? <<<
+
+// but in other cases, it may be a possibility.
 
 fn main() {
     leptos::mount_to_body(|cx| view! { cx, <App/> })
