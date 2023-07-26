@@ -1,5 +1,25 @@
-/** 3.2a Dynamic Attributes - Dynamic Classes */
+/** 3.2b Dynamic Attributes - Dynamic Styles */
 use leptos::*;
+
+// 3.2b Dynamic Styles
+/**
+* Individual CSS properties can be directly updated
+* with a similar style: syntax.
+
+   let (x, set_x) = create_signal(cx, 0);
+   let (y, set_y) = create_signal(cx, 0);
+   view! { cx,
+       <div
+           style="position: absolute"
+           style:left=move || format!("{}px", x() + 100)
+           style:top=move || format!("{}px", y() + 100)
+           style:background-color=move || format!("rgb({}, {}, 100)", x(), y())
+           style=("--columns", x)
+       >
+           "Moves when coordinates change"
+       </div>
+   }
+*/
 
 // The #[component] macro marks a function as a reusable component
 // Components are the building blocks of your user interface
