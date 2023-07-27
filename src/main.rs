@@ -1,16 +1,58 @@
-/** 3.4b Iteration - Dynamic Rendering with <For/> */
+/** 3.4c Iteration - Completed Example */
 use leptos::*;
 
-// This example will show you a method for lists that grow,
-// shrink, or move items, using <For/>
+// Iteration is a very common task in most applications.
+// So how do you take a list of data and render it in the DOM?
+// This example will show you the two ways:
+// 1) for mostly-static lists, using Rust iterators
+// 2) for lists that grow, shrink, or move items, using <For/>
 
 #[component]
 fn App(cx: Scope) -> impl IntoView {
     view! { cx,
         <h1>"Iteration"</h1>
+        <h2>"Static List"</h2>
+        <p>"Use this pattern if the list itself is static."</p>
+        <StaticList length=5/>
         <h2>"Dynamic List"</h2>
         <p>"Use this pattern if the rows in your list will change."</p>
         <DynamicList initial_length=5/>
+    }
+}
+
+/// A list of counters, without the ability
+/// to add or remove any.
+#[component]
+fn StaticList(
+    cx: Scope,
+    /// How many counters to include in this list.
+    length: usize,
+) -> impl IntoView {
+    // create counter signals that start at incrementing numbers
+    let counters = (1..=length).map(|idx| create_signal(cx, idx));
+
+    // when you have a list that doesn't change, you can
+    // manipulate it using ordinary Rust iterators
+    // and collect it into a Vec<_> to insert it into the DOM
+    let counter_buttons = counters
+        .map(|(count, set_count)| {
+            view! { cx,
+                <li>
+                    <button
+                        on:click=move |_| set_count.update(|n| *n += 1)
+                    >
+                        {count}
+                    </button>
+                </li>
+            }
+        })
+        .collect::<Vec<_>>();
+
+    // Note that if `counter_buttons` were a reactive list
+    // and its value changed, this would be very inefficient:
+    // it would rerender every row every time the list changed.
+    view! { cx,
+        <ul>{counter_buttons}</ul>
     }
 }
 
@@ -33,7 +75,7 @@ fn DynamicList(
     // each time we create a counter
     let mut next_counter_id = initial_length;
 
-    // we generate an initial list as in <StaticList/> (commit 3.4a)
+    // we generate an initial list as in <StaticList/>
     // but this time we include the ID along with the signal
     let initial_counters = (0..initial_length)
         .map(|id| (id, create_signal(cx, id + 1)))
@@ -70,7 +112,7 @@ fn DynamicList(
                     // this should usually be a signal or derived signal
                     // if it's not reactive, just render a Vec<_> instead of <For/>
                     each=counters
-                    // the key should be unique and stable for each row,
+                    // the key should be unique and stable for each row
                     // using an index is usually a bad idea, unless your list
                     // can only grow, because moving items around inside the list
                     // means their indices will change and they will all rerender
