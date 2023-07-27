@@ -1,66 +1,125 @@
-/** 3.3h Components and Props - Documenting Components */
+/** 3.4a Iteration - Static Views with Vec<_> */
 use leptos::*;
 
-// This is one of the least essential but most important
-// sections of this book. It’s not strictly necessary to
-// document your components and their props. It may be very
-// important, depending on the size of your team and your app.
-// But it’s very easy, and bears immediate fruit.
+// Sometimes you need to show an item repeatedly, but the
+// list you’re drawing from does not often change. In this
+// case, it’s important to know that you can insert any
+// Vec<IV> where IV: IntoView into your view. In other
+// words, if you can render T, you can render Vec<T>.
 
-// To document a component and its props, you can simply add
-// doc comments on the component function, and each one of
-// the props:
+/*
+  let values = vec![0, 1, 2];
+  view! { cx,
+      // this will just render "012"
+      <p>{values.clone()}</p>
+      // or we can wrap them in <li>
+      <ul>
+          {values.into_iter()
+              .map(|n| view! { cx, <li>{n}</li>})
+              .collect::<Vec<_>>()}
+      </ul>
+  }
+*/
 
-/// Display a progress bar.
-#[component]
-fn ProgressBar(
-    /// Leptos components require a `cx` scope.
-    cx: Scope,
-    /// The maximum value for the progress bar.
-    #[prop(default = 100)]
-    max: u16,
-    /// The current progress toward the max value.
-    #[prop(into)]
-    progress: Signal<i32>,
-) -> impl IntoView {
-    view! { cx,
-        <progress
-            max=max
-            value=progress
-        />
-    }
+// Leptos also provides a .collect_view(cx) helper function
+// that allows you to collect any iterator of T: IntoView
+// into Vec<View>.
+
+/*
+  let values = vec![0, 1, 2];
+  view! { cx,
+      // this will just render "012"
+      <p>{values.clone()}</p>
+      // or we can wrap them in <li>
+      <ul>
+          {values.into_iter()
+              .map(|n| view! { cx, <li>{n}</li>})
+              .collect_view(cx)}
+      </ul>
 }
+*/
+
+// The fact that the list is static doesn’t mean the interface
+// needs to be static. You can render dynamic items as part of
+// a static list.
+
+/*
+  // create a list of N signals
+  let counters = (1..=length).map(|idx| create_signal(cx, idx));
+
+  // each item manages a reactive view
+  // but the list itself will never change
+  let counter_buttons = counters
+      .map(|(count, set_count)| {
+          view! { cx,
+              <li>
+                  <button
+                      on:click=move |_| set_count.update(|n| *n += 1)
+                  >
+                      {count}
+                  </button>
+              </li>
+          }
+      })
+      .collect_view(cx);
+
+  view! { cx,
+      <ul>{counter_buttons}</ul>
+  }
+*/
+
+// You can render a Fn() -> Vec<_> reactively as well. But
+// note that every time it changes, this will re-render every
+// item in the list. This is quite inefficient!
+
+// This example will show you a method for mostly-static lists,
+// using Rust iterators
 
 #[component]
 fn App(cx: Scope) -> impl IntoView {
-    let (count, set_count) = create_signal(cx, 0);
-    let double_count = move || count() * 2;
-
     view! { cx,
-        <button on:click=move |_| { set_count.update(|n| *n += 1); }>
-            "Click me"
-        </button>
-        <br />
-        <br />
-        // .into() converts `ReadSignal` to `Signal`
-        <ProgressBar progress=count/>
-        <br />
-        // use `Signal::derive()` to wrap a derived signal
-        <ProgressBar progress=Signal::derive(cx, double_count)/>
+        <h1>"Iteration"</h1>
+        <h2>"Static List"</h2>
+        <p>"Use this pattern if the list itself is static."</p>
+        <StaticList length=5/>
     }
 }
 
-// That’s all you need to do. These behave like ordinary Rust
-// doc comments, except that you can document individual
-// component props, which can’t be done with Rust function
-// arguments.
+/// A list of counters, without the ability
+/// to add or remove any.
+#[component]
+fn StaticList(
+    cx: Scope,
+    /// How many counters to include in this list.
+    length: usize,
+) -> impl IntoView {
+    // create counter signals that start at incrementing numbers
+    let counters = (1..=length).map(|idx| create_signal(cx, idx));
 
-// This will automatically generate documentation for your
-// component, its Props type, and each of the fields used to
-// add props. It can be a little hard to understand how
-// powerful this is until you hover over the component name
-// or props and see the power of the #[component] macro
-// combined with rust-analyzer here.
+    // when you have a list that doesn't change, you can
+    // manipulate it using ordinary Rust iterators
+    // and collect it into a Vec<_> to insert it into the DOM
+    let counter_buttons = counters
+        .map(|(count, set_count)| {
+            view! { cx,
+                <li>
+                    <button
+                        on:click=move |_| set_count.update(|n| *n += 1)
+                    >
+                        {count}
+                    </button>
+                </li>
+            }
+        })
+        .collect::<Vec<_>>();
+
+    // Note that if `counter_buttons` were a reactive list
+    // and its value changed, this would be very inefficient:
+    // it would rerender every row every time the list changed.
+    view! { cx,
+        <ul>{counter_buttons}</ul>
+    }
+}
 
 fn main() {
     leptos::mount_to_body(|cx| view! { cx, <App/> })
