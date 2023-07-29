@@ -1,128 +1,79 @@
-/** 3.5b Forms and Inputs - Uncontrolled Inputs */
-use leptos::{ev::SubmitEvent, *};
+/* 3.6a Control Flow - Basic If Else */
+use leptos::*;
+// A Few Tips
 
-// In an "uncontrolled input," the browser controls the state
-// of the input element. Rather than continuously updating a
-// signal to hold its value, we use a NodeRef to access the
-// input once when we want to get its value.
+// When thinking about control flow with Leptos, it’s important
+// to remember a few things:
 
-// In this example, we only notify the framework when the <form>
-// fires a submit event.
+// 1. Rust is an expression-oriented language: control-flow
+//    expressions like if x() { y } else { z } and
+//    match x() { ... } return their values. This makes them
+//    very useful for declarative user interfaces.
+// 2. For any T that implements IntoView—in other words, for
+//    any type that Leptos knows how to render—Option<T> and
+//    Result<T, impl Error> also implement IntoView. And just
+//    as Fn() -> T renders a reactive T, Fn() -> Option<T>
+//    and Fn() -> Result<T, impl Error> are reactive.
+// 3. Rust has lots of handy helpers like Option::map,
+//    Option::and_then, Option::ok_or, Result::map, Result::ok,
+//    and bool::then that allow you to convert, in a declarative
+//    way, between a few different standard types, all of which
+//    can be rendered.
+//    Spending time in the Option and Result docs in particular
+//    is one of the best ways to level up your Rust game.
+// 4. And always remember: to be reactive, values must be functions.
+//    You’ll see me constantly wrap things in a move || closure,
+//    below. This is to ensure that they actually rerun when the
+//    signal they depend on changes, keeping the UI reactive.
 
-/*
-let (name, set_name) = create_signal(cx, "Uncontrolled".to_string());
+// To connect the dots a little: this means that you can actually
+// implement most of your control flow with native Rust code,
+// without any control-flow components or special knowledge.
 
-let input_element: NodeRef<Input> = create_node_ref(cx);
-*/
-
-// NodeRef is a kind of reactive smart pointer: we can use it to
-// access the underlying DOM node. Its value will be set when the
-// element is rendered.
-
-/*
-let on_submit = move |ev: SubmitEvent| {
-    // stop the page from reloading!
-    ev.prevent_default();
-
-    // here, we'll extract the value from the input
-    let value = input_element()
-        // event handlers can only fire after the view
-        // is mounted to the DOM, so the `NodeRef` will be `Some`
-        .expect("<input> to exist")
-        // `NodeRef` implements `Deref` for the DOM element type
-        // this means we can call`HtmlInputElement::value()`
-        // to get the current value of the input
-        .value();
-    set_name(value);
-};
-*/
-
-// Our on_submit handler will access the input’s value and use it
-// to call set_name. To access the DOM node stored in the NodeRef,
-// we can simply call it as a function (or using .get()). This will
-// return Option<web_sys::HtmlInputElement>, but we know it will
-// already have been filled when we rendered the view, so it’s safe
-// to unwrap here.
-
-// We can then call .value() to get the value out of the input,
-// because NodeRef gives us access to a correctly-typed HTML
-// element.
+// For example, let’s start with a simple signal and derived signal:
 
 /*
-view! { cx,
-    <form on:submit=on_submit>
-        <input type="text"
-            value=name
-            node_ref=input_element
-        />
-        <input type="submit" value="Submit"/>
-    </form>
-    <p>"Name is: " {name}</p>
-}
+  let (value, set_value) = create_signal(cx, 0);
+  let is_odd = move || value() & 1 == 1;
+
+  If you don’t recognize what’s going on with is_odd, don’t
+  worry about it too much. It’s just a simple way to test
+  whether an integer is odd by doing a bitwise AND with 1.
 */
 
-// The view should be pretty self-explanatory by now. Note two
-// things:
-//
-// 1. Unlike in the controlled input example, we use value
-//    (not prop:value). This is because we’re just setting the
-//    initial value of the input, and letting the browser control
-//    its state. (We could use prop:value instead.)
-// 2. We use node_ref to fill the NodeRef. (Older examples
-//    sometimes use _ref. They are the same thing, but node_ref
-//    has better rust-analyzer support.)
+// We can use these signals and ordinary Rust to build most
+// control flow.
 
 #[component]
 fn App(cx: Scope) -> impl IntoView {
-    view! { cx,
-        <h2>"Uncontrolled Component"</h2>
-        <UncontrolledComponent/>
-    }
-}
-
-#[component]
-fn UncontrolledComponent(cx: Scope) -> impl IntoView {
-    // import the type for <input>
-    use leptos::html::Input;
-
-    let (name, set_name) = create_signal(cx, "Uncontrolled".to_string());
-
-    // we'll use a NodeRef to store a reference to the input element
-    // this will be filled when the element is created
-    let input_element: NodeRef<Input> = create_node_ref(cx);
-
-    // fires when the form `submit` event happens
-    // this will store the value of the <input> in our signal
-    let on_submit = move |ev: SubmitEvent| {
-        // stop the page from reloading!
-        ev.prevent_default();
-
-        // here, we'll extract the value from the input
-        let value = input_element()
-            // event handlers can only fire after the view
-            // is mounted to the DOM, so the `NodeRef` will be `Some`
-            .expect("<input> to exist")
-            // `NodeRef` implements `Deref` for the DOM element type
-            // this means we can call`HtmlInputElement::value()`
-            // to get the current value of the input
-            .value();
-        set_name(value);
-    };
+    let (value, set_value) = create_signal(cx, 0);
+    let is_odd = move || value() & 1 == 1;
 
     view! { cx,
-        <form on:submit=on_submit>
-            <input type="text"
-                // here, we use the `value` *attribute* to set only
-                // the initial value, letting the browser maintain
-                // the state after that
-                value=name
+        <h1>"Control Flow - Basic If"</h1>
 
-                // store a reference to this input in `input_element`
-                node_ref=input_element
-            />
-            <input type="submit" value="Submit"/>
-        </form>
-        <p>"Name is: " {name}</p>
+        // Simple UI to update and show a value
+        <button on:click=move |_| set_value.update(|n| *n += 1)>
+            "+1"
+        </button>
+        <p>"Value is: " {value}</p>
+
+        <hr/>
+
+        // Basic if() {} else {}
+        <p>{value} " is: "
+        {move ||
+          if is_odd() {
+            "Odd"
+          } else {
+            "Even"
+          }
+        }
+        </p>
+
+        // An if expression returns its value, and a &str implements
+        // IntoView, so a Fn() -> &str implements IntoView, so this...
+        // just works!
     }
 }
 
