@@ -1,4 +1,4 @@
-/* 3.6b Control Flow - Option<T> */
+/* 3.6c Control Flow - Match Statements */
 use leptos::*;
 // A Few Tips
 
@@ -44,26 +44,31 @@ use leptos::*;
 // We can use these signals and ordinary Rust to build most
 // control flow.
 
+// ----------------------------------------------------------------
+// Match Statements
+// ----------------------------------------------------------------
+
 #[component]
 fn App(cx: Scope) -> impl IntoView {
     let (value, set_value) = create_signal(cx, 0);
     let is_odd = move || value() & 1 == 1;
 
-    // Option<T>
-    // Render some text if it’s odd, and nothing if it’s even
-    let message1 = move || {
-        if is_odd() {
-            Some("Ding, Ding, Ding!")
-        } else {
-            None
-        }
+    // Because it's just ordinary Rust code, you have all the power
+    // of Rust’s pattern matching at your disposal.
+    let message = move || match value() {
+        0 => "Zero",
+        1 => "One",
+        2 => "Two",
+        3 => "Three",
+        4 => "Four",
+        _ if value() > 6 => "Out of range",
+        _ if is_odd() => "Odd",
+        _ if !is_odd() => "Even",
+        _ => "Unknown", // Never reached but compiler doesn't know
     };
 
-    // We can make it a little shorter if we’d like, using bool::then()
-    let message2 = move || is_odd().then(|| "Ding, Ding, Ding!");
-
     view! { cx,
-        <h1>"Control Flow - Option<T>"</h1>
+        <h1>"Control Flow - Match Statements"</h1>
 
         // Simple UI to update and show a value
         <button on:click=move |_| set_value.update(|n| *n += 1)>
@@ -73,13 +78,8 @@ fn App(cx: Scope) -> impl IntoView {
 
         <hr/>
 
-        // Option<T>
-        <p>"Odd Alarm One: " {message1}</p>
-        <p>"Odd Alarm Two: " {message2}</p>
-
-        // This could be inlined but you get better cargo fmt and
-        // rust-analyzer support by pulling things out of the view
-        <p>"Odd Alarm three: " {move || is_odd().then(|| "Ding, Ding, Ding!")}</p>
+        // match Statements
+        <p>{value} " text -> " {message}</p>
     }
 }
 
