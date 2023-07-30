@@ -1,4 +1,4 @@
-/* 3.6a Control Flow - Basic If Else */
+/* 3.6b Control Flow - Option<T> */
 use leptos::*;
 // A Few Tips
 
@@ -49,8 +49,21 @@ fn App(cx: Scope) -> impl IntoView {
     let (value, set_value) = create_signal(cx, 0);
     let is_odd = move || value() & 1 == 1;
 
+    // Option<T>
+    // Render some text if it’s odd, and nothing if it’s even
+    let message1 = move || {
+        if is_odd() {
+            Some("Ding, Ding, Ding!")
+        } else {
+            None
+        }
+    };
+
+    // We can make it a little shorter if we’d like, using bool::then()
+    let message2 = move || is_odd().then(|| "Ding, Ding, Ding!");
+
     view! { cx,
-        <h1>"Control Flow - Basic If"</h1>
+        <h1>"Control Flow - Option<T>"</h1>
 
         // Simple UI to update and show a value
         <button on:click=move |_| set_value.update(|n| *n += 1)>
@@ -60,20 +73,13 @@ fn App(cx: Scope) -> impl IntoView {
 
         <hr/>
 
-        // Basic if() {} else {}
-        <p>{value} " is: "
-        {move ||
-          if is_odd() {
-            "Odd"
-          } else {
-            "Even"
-          }
-        }
-        </p>
+        // Option<T>
+        <p>"Odd Alarm One: " {message1}</p>
+        <p>"Odd Alarm Two: " {message2}</p>
 
-        // An if expression returns its value, and a &str implements
-        // IntoView, so a Fn() -> &str implements IntoView, so this...
-        // just works!
+        // This could be inlined but you get better cargo fmt and
+        // rust-analyzer support by pulling things out of the view
+        <p>"Odd Alarm three: " {move || is_odd().then(|| "Ding, Ding, Ding!")}</p>
     }
 }
 
