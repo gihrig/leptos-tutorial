@@ -1,4 +1,4 @@
-/* 3.6d Control Flow - Preventing Over-Rendering demo */
+/* 3.6e Control Flow - Preventing Over-Rendering <Show/> */
 use leptos::*;
 // A Few Tips
 
@@ -45,63 +45,44 @@ use leptos::*;
 // control flow.
 
 // ----------------------------------------------------------------
-// Preventing Over-Rendering demo
+// Preventing Over-Rendering <Show/>
 // ----------------------------------------------------------------
 
-// Everything we’ve just done is basically fine. But there’s one
-// thing you should remember and try to be careful with. Each one
-// of the control-flow functions we’ve created so far is basically
-// a derived signal: it will rerun every time the value changes.
-// In the examples above, where the value switches from even to
-// odd on every change, this is fine.
-//
-// But consider the following example:
+#[component]
+fn Big(_cx: Scope) -> impl IntoView {
+    log!("rendering Big");
+    "Big"
+}
+
+#[component]
+fn Small(_cx: Scope) -> impl IntoView {
+    log!("rendering Small");
+    "Small"
+}
+
+// The <Show/> component is the answer to over-rendering. You pass
+// it a `when` condition function, a fallback to be shown if the
+// when function returns false, and children to be rendered if
+// `when` returns true.
+
+// <Show/> memoizes the when condition, so it only renders its
+// <Small/> once, continuing to show the same component until value
+// is greater than five; then it renders <Big/> once, continuing to
+// show it indefinitely.
+
+// This is a helpful tool to avoid rerendering when using dynamic if
+// expressions. As always, there's some overhead: for a very simple
+// node (like updating a single text node, or updating a class or
+// attribute), a move || if ... will be more efficient. But if it’s
+// at all expensive to render either branch, reach for <Show/>.
 
 #[component]
 fn App(cx: Scope) -> impl IntoView {
     let (value, set_value) = create_signal(cx, 0);
-    let message = move || {
-        if value() > 5 {
-            log!("{}: rendering Big", value());
-            "Big"
-        } else {
-            log!("{}: rendering Small", value());
-            "Small"
-        }
-        // Each click logs to the browser console:
-        /*
-          1: rendering Small
-          2: rendering Small
-          3: rendering Small
-          4: rendering Small
-          5: rendering Small
-          6: rendering Big
-          7: rendering Big
-          8: rendering Big
-          ... ad infinitum
-        */
-
-        // Every time value changes, it reruns the if statement.
-        // This makes sense, with how reactivity works. But it
-        // has a downside. For a simple text node, rerunning the
-        // if statement and rerendering isn’t a big deal. But
-        // imagine it were like this:
-        /*
-          let message = move || if value() > 5 {
-            <Big/>
-          } else {
-            <Small/>
-          };
-        */
-
-        // This rerenders <Small/> five times, then <Big/> infinitely.
-        // If they’re loading resources, creating signals, or even
-        // just creating DOM nodes, this is unnecessary work.
-    };
 
     view! { cx,
-        <h1>"Control Flow - Preventing Over-Rendering demo"</h1>
-        <h2>"Entire if statement runs on every value change"</h2>
+        <h1>"Control Flow - Preventing Over-Rendering <Show/>"</h1>
+        <h2>"<Big/> and <Small/> components only render as needed"</h2>
         <p>"See browser console"</p>
 
         // Simple UI to update and show a value
@@ -112,7 +93,13 @@ fn App(cx: Scope) -> impl IntoView {
 
         <hr/>
 
-      <p>{message}</p>
+        // See discussion above
+        <Show
+          when=move || { value() > 5 }
+          fallback=|cx| view! { cx, <Small/> }
+        >
+          <Big/>
+        </Show>
     }
 }
 
