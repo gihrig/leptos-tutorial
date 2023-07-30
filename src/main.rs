@@ -1,4 +1,4 @@
-/* 3.6c Control Flow - Match Statements */
+/* 3.6d Control Flow - Preventing Over-Rendering demo */
 use leptos::*;
 // A Few Tips
 
@@ -45,30 +45,64 @@ use leptos::*;
 // control flow.
 
 // ----------------------------------------------------------------
-// Match Statements
+// Preventing Over-Rendering demo
 // ----------------------------------------------------------------
+
+// Everything we’ve just done is basically fine. But there’s one
+// thing you should remember and try to be careful with. Each one
+// of the control-flow functions we’ve created so far is basically
+// a derived signal: it will rerun every time the value changes.
+// In the examples above, where the value switches from even to
+// odd on every change, this is fine.
+//
+// But consider the following example:
 
 #[component]
 fn App(cx: Scope) -> impl IntoView {
     let (value, set_value) = create_signal(cx, 0);
-    let is_odd = move || value() & 1 == 1;
+    let message = move || {
+        if value() > 5 {
+            log!("{}: rendering Big", value());
+            "Big"
+        } else {
+            log!("{}: rendering Small", value());
+            "Small"
+        }
+        // Each click logs to the browser console:
+        /*
+          1: rendering Small
+          2: rendering Small
+          3: rendering Small
+          4: rendering Small
+          5: rendering Small
+          6: rendering Big
+          7: rendering Big
+          8: rendering Big
+          ... ad infinitum
+        */
 
-    // Because it's just ordinary Rust code, you have all the power
-    // of Rust’s pattern matching at your disposal.
-    let message = move || match value() {
-        0 => "Zero",
-        1 => "One",
-        2 => "Two",
-        3 => "Three",
-        4 => "Four",
-        _ if value() > 6 => "Out of range",
-        _ if is_odd() => "Odd",
-        _ if !is_odd() => "Even",
-        _ => "Unknown", // Never reached but compiler doesn't know
+        // Every time value changes, it reruns the if statement.
+        // This makes sense, with how reactivity works. But it
+        // has a downside. For a simple text node, rerunning the
+        // if statement and rerendering isn’t a big deal. But
+        // imagine it were like this:
+        /*
+          let message = move || if value() > 5 {
+            <Big/>
+          } else {
+            <Small/>
+          };
+        */
+
+        // This rerenders <Small/> five times, then <Big/> infinitely.
+        // If they’re loading resources, creating signals, or even
+        // just creating DOM nodes, this is unnecessary work.
     };
 
     view! { cx,
-        <h1>"Control Flow - Match Statements"</h1>
+        <h1>"Control Flow - Preventing Over-Rendering demo"</h1>
+        <h2>"Entire if statement runs on every value change"</h2>
+        <p>"See browser console"</p>
 
         // Simple UI to update and show a value
         <button on:click=move |_| set_value.update(|n| *n += 1)>
@@ -78,8 +112,7 @@ fn App(cx: Scope) -> impl IntoView {
 
         <hr/>
 
-        // match Statements
-        <p>{value} " text -> " {message}</p>
+      <p>{message}</p>
     }
 }
 
