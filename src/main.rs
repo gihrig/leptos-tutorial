@@ -1,15 +1,14 @@
-/* 3.7a Error Handling - Result<T, E> */
+/* 3.7b Error Handling - <ErrorBoundary/> */
 
 use leptos::*;
 
-// In the last chapter, we saw that you can render Option<T>:
-// in the None case, it will render nothing, and in the T case,
-// it will render T (that is, if T implements IntoView). You
-// can actually do something very similar with a Result<T, E>.
-// In the Err(_) case, it will render nothing. In the Ok(T)
-// case, it will render the T.
+// An <ErrorBoundary/> is a little like the <Show/> component
+// we saw in the last chapter. If everything’s okay—which is
+// to say, if everything is `Ok(_)` it renders its children. But
+// if there’s an `Err(_)` rendered among those children, it will
+// trigger the <ErrorBoundary/>’s fallback.
 
-// Let’s start with a simple component to capture a number input.
+// Let’s add an <ErrorBoundary/> to this example.
 
 #[component]
 fn NumericInput(cx: Scope) -> impl IntoView {
@@ -19,13 +18,30 @@ fn NumericInput(cx: Scope) -> impl IntoView {
     let on_input = move |ev| set_value(event_target_value(&ev).parse::<i32>());
 
     view! {cx,
+      <h1>"Error Handling"</h1>
       <label>
-        "Type a number (or not!)"
+        "Type a number (or something that's not a number!) "
         <input on:input=on_input/>
+        <ErrorBoundary
+          // The fallback receives a signal containing an error
+          fallback=|cx, errors| view! { cx,
+            <div class="error">
+              <p>"Not a number! Errors:"</p>
+              // We can render a list of errors as strings, if we'd like
+              <ul>
+                {move || errors.get()
+                  .into_iter()
+                  .map(|(_, e)| view! { cx, <li>{e.to_string()}</li>})
+                  .collect_view(cx)
+                }
+              </ul>
+            </div>
+          }
+        >
         <p>
-          "You entered "
-          <strong>{value}</strong>
+          "You entered " <strong>{value}</strong>
         </p>
+        </ErrorBoundary>
       </label>
     }
 }
@@ -34,23 +50,21 @@ fn main() {
     leptos::mount_to_body(|cx| view! { cx, <NumericInput/> })
 }
 
-// Every time you change the input, on_input will attempt to parse
-// its value into a 32-bit integer (i32), and store it in our value
-// signal, which is a Result<i32, _>. If you type the number 42,
-// the UI will display
+// Now, if you type 42, value is Ok(42) and you’ll see
 
 /*
   You entered 42
 */
 
-// But if you type the string "foo", it will display
+// If you type "foo", value is Err(_) and the fallback
+// will render. We’ve chosen to render the list of
+// errors as a String, so you’ll see something like
 
 /*
-  You entered
+  Not a number! Errors:
+  - cannot parse integer from empty string
 */
 
-// This is not great. It saves us using .unwrap_or_default()
-// or something, but it would be much nicer if we could catch
-// the error and do something with it.
-
-// You can do that, with the <ErrorBoundary/> component.
+// If you fix the error, the error message will disappear
+// and the content you’re wrapping in an <ErrorBoundary/>
+// will appear again.
