@@ -1,5 +1,5 @@
-/* 3.6f Control Flow - Type Conversions */
-use leptos::*;
+/* 3.6g Control Flow - Final Example */
+
 // A Few Tips
 
 // When thinking about control flow with Leptos, it’s important
@@ -45,58 +45,18 @@ use leptos::*;
 // control flow.
 
 // ----------------------------------------------------------------
-// Type Conversions
+// Final Example
 // ----------------------------------------------------------------
-
-// The view macro doesn’t return the most-generic wrapping type `View`.
-// Instead, it returns things with types like `Fragment` or
-// `HtmlElement<Input>`. This can be a little annoying if you’re
-// returning different HTML elements from different branches of a
-// conditional:
-/*
-  <main>
-      {move || match is_odd() {
-          true if value() == 1 => {
-              // returns HtmlElement<Pre>
-              view! { cx, <pre>"One"</pre> }
-          },
-          false if value() == 2 => {
-              // returns HtmlElement<P>
-              view! { cx, <p>"Two"</p> }
-              ^^^^^^^^^^^^^^^^^^^^^^^^^^
-              `match` arms have incompatible types
-              expected struct `HtmlElement<Pre>`
-              found struct `HtmlElement<P>`
-          }
-          // returns HtmlElement<Textarea>
-          _ => view! { cx, <textarea>{value()}</textarea> }
-      }}
-  </main>
-*/
-
-// This strong typing is actually very powerful, because HtmlElement
-// is, among other things, a smart pointer: each HtmlElement<T> type
-// implements Deref for the appropriate underlying web_sys type. In
-// other words, in the browser your view returns real DOM elements,
-// and you can access native DOM methods on them.
-//
-// But it can be a little annoying in conditional logic like this,
-// because you can’t return different types from different branches
-// of a condition in Rust. There are two ways to get yourself out of
-// this situation:
-
-// 1. If you have multiple HtmlElement types, convert them to
-//    HtmlElement<AnyElement> with .into_any()
-// 2. If you have a variety of view types that are not all HtmlElement,
-// convert them to Views with .into_view(cx).
+use leptos::*;
 
 #[component]
 fn App(cx: Scope) -> impl IntoView {
     let (value, set_value) = create_signal(cx, 0);
     let is_odd = move || value() & 1 == 1;
+    let odd_text = move || if is_odd() { Some("How odd!") } else { None };
 
     view! { cx,
-        <h1>"Control Flow - Type Conversion"</h1>
+        <h1>"Control Flow - Final Example"</h1>
 
         // Simple UI to update and show a value
         <button on:click=move |_| set_value.update(|n| *n += 1)>
@@ -106,23 +66,70 @@ fn App(cx: Scope) -> impl IntoView {
 
         <hr/>
 
-        // Here’s the above example, with the `.into_any`
-        // conversion added:
-        <main>
-          {move || match is_odd() {
-              true if value() == 1 => {
-                  // returns HtmlElement<Pre>
-                  view! { cx, <pre>"One"</pre> }.into_any()
-              },
-              false if value() == 2 => {
-                  // returns HtmlElement<P>
-                  view! { cx, <p>"Two"</p> }.into_any()
-              }
-              // returns HtmlElement<Textarea>
-              _ => view! { cx, <textarea>{value()}</textarea> }.into_any()
-          }}
-        </main>
+        <h2><code>"Option<T>"</code></h2>
+        // For any `T` that implements `IntoView`,
+        // so does `Option<T>`
 
+        <p>": "{odd_text}</p>
+        // This means you can use `Option` methods on it
+        <p>": "{move || odd_text().map(|text| text.len())}</p>
+
+        <h2>"Conditional Logic"</h2>
+        // You can do dynamic conditional if-then-else
+        // logic in several ways
+        //
+        // a. An "if" expression in a function
+        //    This will simply re-render every time the value
+        //    changes, which makes it good for lightweight UI
+        <p>
+            {move || if is_odd() {
+                "Odd"
+            } else {
+                "Even"
+            }}
+        </p>
+
+        // b. Toggling some kind of class
+        //    This is smart for an element that's going
+        //    to be toggled often, because it isn't destroyed
+        //    between states (you can find the `red` class
+        //    in `index.html`)
+        <p class:red=is_odd>"Red if odd."</p>
+
+        // c. The <Show/> component
+        //    This only renders the fallback and the child
+        //    once, lazily, and toggles between them when
+        //    needed. This makes it more efficient in many cases
+        //    than a {move || if ...} block
+        <Show when=is_odd
+            fallback=|cx| view! { cx, <p>"Even steven"</p> }
+        >
+            <p>"Oddment"</p>
+        </Show>
+
+        // d. Because `bool::then()` converts a `bool` to
+        //    `Option`, you can use it to create a show/hide
+        //    or other toggle
+        {move || is_odd().then(|| view! { cx, <p>"Oddity!"</p> })
+        .unwrap_or_else(|| view! { cx, <p>"Evenity!"</p> })}
+
+        <h2>"Converting between Types"</h2>
+        // e. Note: if branches return different types,
+        //    you can convert between them with
+        //    `.into_any()` (for different HTML element types)
+        //    or `.into_view(cx)` (for all view types)
+        {move || match is_odd() {
+            true if value() == 1 => {
+                // <pre> returns HtmlElement<Pre>
+                view! { cx, <pre>"The One"</pre> }.into_any()
+            },
+            false if value() == 2 => {
+                // <p> returns HtmlElement<P>
+                // so we convert into a more generic type
+                view! { cx, <p>"The Two"</p> }.into_any()
+            }
+            _ => view! { cx, <textarea>{value()}</textarea> }.into_any()
+        }}
     }
 }
 
