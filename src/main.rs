@@ -1,4 +1,4 @@
-/* 3.6e Control Flow - Preventing Over-Rendering <Show/> */
+/* 3.6f Control Flow - Type Conversions */
 use leptos::*;
 // A Few Tips
 
@@ -45,45 +45,58 @@ use leptos::*;
 // control flow.
 
 // ----------------------------------------------------------------
-// Preventing Over-Rendering <Show/>
+// Type Conversions
 // ----------------------------------------------------------------
 
-#[component]
-fn Big(_cx: Scope) -> impl IntoView {
-    log!("rendering Big");
-    "Big"
-}
+// The view macro doesn’t return the most-generic wrapping type `View`.
+// Instead, it returns things with types like `Fragment` or
+// `HtmlElement<Input>`. This can be a little annoying if you’re
+// returning different HTML elements from different branches of a
+// conditional:
+/*
+  <main>
+      {move || match is_odd() {
+          true if value() == 1 => {
+              // returns HtmlElement<Pre>
+              view! { cx, <pre>"One"</pre> }
+          },
+          false if value() == 2 => {
+              // returns HtmlElement<P>
+              view! { cx, <p>"Two"</p> }
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+              `match` arms have incompatible types
+              expected struct `HtmlElement<Pre>`
+              found struct `HtmlElement<P>`
+          }
+          // returns HtmlElement<Textarea>
+          _ => view! { cx, <textarea>{value()}</textarea> }
+      }}
+  </main>
+*/
 
-#[component]
-fn Small(_cx: Scope) -> impl IntoView {
-    log!("rendering Small");
-    "Small"
-}
+// This strong typing is actually very powerful, because HtmlElement
+// is, among other things, a smart pointer: each HtmlElement<T> type
+// implements Deref for the appropriate underlying web_sys type. In
+// other words, in the browser your view returns real DOM elements,
+// and you can access native DOM methods on them.
+//
+// But it can be a little annoying in conditional logic like this,
+// because you can’t return different types from different branches
+// of a condition in Rust. There are two ways to get yourself out of
+// this situation:
 
-// The <Show/> component is the answer to over-rendering. You pass
-// it a `when` condition function, a fallback to be shown if the
-// when function returns false, and children to be rendered if
-// `when` returns true.
-
-// <Show/> memoizes the when condition, so it only renders its
-// <Small/> once, continuing to show the same component until value
-// is greater than five; then it renders <Big/> once, continuing to
-// show it indefinitely.
-
-// This is a helpful tool to avoid rerendering when using dynamic if
-// expressions. As always, there's some overhead: for a very simple
-// node (like updating a single text node, or updating a class or
-// attribute), a move || if ... will be more efficient. But if it’s
-// at all expensive to render either branch, reach for <Show/>.
+// 1. If you have multiple HtmlElement types, convert them to
+//    HtmlElement<AnyElement> with .into_any()
+// 2. If you have a variety of view types that are not all HtmlElement,
+// convert them to Views with .into_view(cx).
 
 #[component]
 fn App(cx: Scope) -> impl IntoView {
     let (value, set_value) = create_signal(cx, 0);
+    let is_odd = move || value() & 1 == 1;
 
     view! { cx,
-        <h1>"Control Flow - Preventing Over-Rendering <Show/>"</h1>
-        <h2>"<Big/> and <Small/> components only render as needed"</h2>
-        <p>"See browser console"</p>
+        <h1>"Control Flow - Type Conversion"</h1>
 
         // Simple UI to update and show a value
         <button on:click=move |_| set_value.update(|n| *n += 1)>
@@ -93,13 +106,23 @@ fn App(cx: Scope) -> impl IntoView {
 
         <hr/>
 
-        // See discussion above
-        <Show
-          when=move || { value() > 5 }
-          fallback=|cx| view! { cx, <Small/> }
-        >
-          <Big/>
-        </Show>
+        // Here’s the above example, with the `.into_any`
+        // conversion added:
+        <main>
+          {move || match is_odd() {
+              true if value() == 1 => {
+                  // returns HtmlElement<Pre>
+                  view! { cx, <pre>"One"</pre> }.into_any()
+              },
+              false if value() == 2 => {
+                  // returns HtmlElement<P>
+                  view! { cx, <p>"Two"</p> }.into_any()
+              }
+              // returns HtmlElement<Textarea>
+              _ => view! { cx, <textarea>{value()}</textarea> }.into_any()
+          }}
+        </main>
+
     }
 }
 
