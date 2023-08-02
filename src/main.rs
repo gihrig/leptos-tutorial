@@ -1,5 +1,5 @@
-/* 3.8d Parent-Child Communication - Providing a Context */
-use leptos::*;
+/* 3.8e Parent-Child Communication - Final Example */
+use leptos::{ev::MouseEvent, *};
 
 // You can think of your application as a nested tree of components.
 // Each component handles its own local state and manages a section
@@ -23,181 +23,120 @@ use leptos::*;
 // notifications about events or state changes back up to the parent?
 
 // There are four basic patterns of parent-child communication in Leptos.
+// These are covered in the previous commits.
 
-// 4. Providing a Context
+// ----------------------------------------------------------------
 
-// This version is actually a variant on Option 1. Say you have a
-// deeply-nested component tree:
+// This highlights four different ways that child components can communicate
+// with their parent:
+// 1) <ButtonA/>: passing a WriteSignal as one of the child component props,
+//    for the child component to write into and the parent to read
+// 2) <ButtonB/>: passing a closure as one of the child component props, for
+//    the child component to call
+// 3) <ButtonC/>: adding an `on:` event listener to a component
+// 4) <ButtonD/>: providing a context that is used in the component (rather than prop drilling)
 
-/*
-  #[component]
-  pub fn App(cx: Scope) -> impl IntoView {
-      let (toggled, set_toggled) = create_signal(cx, false);
-      view! { cx,
-          <p>"Toggled? " {toggled}</p>
-          <Layout/>
-      }
-  }
-
-  #[component]
-  pub fn Layout(cx: Scope) -> impl IntoView {
-      view! { cx,
-          <header>
-              <h1>"My Page"</h1>
-          </header>
-          <main>
-              <Content/>
-          </main>
-      }
-  }
-
-  #[component]
-  pub fn Content(cx: Scope) -> impl IntoView {
-      view! { cx,
-          <div class="content">
-              <ButtonD/>
-          </div>
-      }
-  }
-
-  #[component]
-  pub fn ButtonD<F>(cx: Scope) -> impl IntoView {
-      todo!()
-  }
-*/
-
-// Now <ButtonD/> is no longer a direct child of <App/>, so you can’t
-// simply pass your WriteSignal to its props. You could do what’s
-// sometimes called “prop drilling,” adding a prop to each layer between
-// the two:
-
-/*
-  #[component]
-  pub fn App(cx: Scope) -> impl IntoView {
-      let (toggled, set_toggled) = create_signal(cx, false);
-      view! { cx,
-          <p>"Toggled? " {toggled}</p>
-          <Layout set_toggled/>
-      }
-  }
-
-  #[component]
-  pub fn Layout(cx: Scope, set_toggled: WriteSignal<bool>) -> impl IntoView {
-      view! { cx,
-          <header>
-              <h1>"My Page"</h1>
-          </header>
-          <main>
-              <Content set_toggled/>
-          </main>
-      }
-  }
-
-  #[component]
-  pub fn Content(cx: Scope, set_toggled: WriteSignal<bool>) -> impl IntoView {
-      view! { cx,
-          <div class="content">
-              <ButtonD set_toggled/>
-          </div>
-      }
-  }
-
-  #[component]
-  pub fn ButtonD<F>(cx: Scope, set_toggled: WriteSignal<bool>) -> impl IntoView {
-      todo!()
-  }
-*/
-
-// This is a mess! <Layout/> and <Content/> don’t need set_toggled; they
-// just pass it through to <ButtonD/>. But I need to declare the prop in
-// triplicate. This is not only annoying but hard to maintain: imagine
-// we add a “half-toggled” option and the type of set_toggled needs to
-// change to an enum. We have to change it in three places!
-
-// Isn’t there some way to skip levels?
-
-// There is!
-
-// The Context API
-
-// You can provide data that skips levels by using provide_context and
-// use_context. Contexts are identified by the type of the data you
-// provide (in this example, WriteSignal<bool>), and they exist in a
-// top-down tree that follows the contours of your UI tree. In this
-// example, we can use context to skip the unnecessary prop drilling.
+#[derive(Copy, Clone)]
+struct SmallcapsContext(WriteSignal<bool>);
 
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
-    let (toggled, set_toggled) = create_signal(cx, false);
+    // just some signals to toggle three classes on our <p>
+    let (red, set_red) = create_signal(cx, false);
+    let (right, set_right) = create_signal(cx, false);
+    let (italics, set_italics) = create_signal(cx, false);
+    let (smallcaps, set_smallcaps) = create_signal(cx, false);
 
-    // share `set_toggled` with all children of this component
-    provide_context(cx, set_toggled);
+    // the newtype pattern isn't *necessary* here but is a good practice
+    // it avoids confusion with other possible future `WriteSignal<bool>` contexts
+    // and makes it easier to refer to it in ButtonC
+    provide_context(cx, SmallcapsContext(set_smallcaps));
 
     view! { cx,
-        <h1>"Parent-Child Communication - Providing a Context"</h1>
-        <strong>"Parent: "</strong>
-        <span>"Toggled? " {toggled}</span>
-        <Layout/>
+      <main>
+        <h1>"Parent-Child Communication - Final Example"</h1>
+        <p
+          // class: attributes take F: Fn() => bool, and these signals all implement Fn()
+          class:red=red
+          class:right=right
+          class:italics=italics
+          class:smallcaps=smallcaps
+        >
+          "Lorem ipsum sit dolor amet."
+        </p>
+
+        // Button A: pass the signal setter
+        <ButtonA setter=set_red/>
+
+        // Button B: pass a closure
+        <ButtonB on_click=move |_| set_right.update(|value| *value = !*value)/>
+
+        // Button B: use a regular event listener
+        // setting an event listener on a component like this applies it
+        // to each of the top-level elements the component returns
+        <ButtonC on:click=move |_| set_italics.update(|value| *value = !*value)/>
+
+        // Button D gets its setter from context rather than props
+        <ButtonD/>
+      </main>
     }
 }
 
-// <Layout/> and <Content/> no longer pass `set_toggled`
+/// Button A receives a signal setter and updates the signal itself
 #[component]
-pub fn Layout(cx: Scope) -> impl IntoView {
+pub fn ButtonA(
+    cx: Scope,
+    /// Signal that will be toggled when the button is clicked.
+    setter: WriteSignal<bool>,
+) -> impl IntoView {
     view! { cx,
-        <header>
-            <h4>"Layout..."</h4>
-        </header>
-        <main>
-            <Content/>
-        </main>
+      <button on:click=move |_| setter.update(|value| *value = !*value)>"Toggle Red"</button>
     }
 }
 
+/// Button B receives a closure
 #[component]
-pub fn Content(cx: Scope) -> impl IntoView {
-    view! { cx,
-        <div class="content">
-          <h4>"Content..."</h4>
-          <ButtonD/>
-        </div>
-    }
+pub fn ButtonB<F>(
+    cx: Scope,
+    /// Callback that will be invoked when the button is clicked.
+    on_click: F,
+) -> impl IntoView
+where
+    F: Fn(MouseEvent) + 'static,
+{
+    view! { cx, <button on:click=on_click>"Toggle Right"</button> }
+
+    // just a note: in an ordinary function ButtonB could take on_click: impl Fn(MouseEvent)
+    // + 'static and save you from typing out the generic.
+    // The component macro actually expands to define a struct:
+    //
+    // struct ButtonBProps<F> where F: Fn(MouseEvent) + 'static {
+    //   on_click: F
+    // }
+    //
+    // this is what allows us to have named props in our component invocation,
+    // instead of an ordered list of function arguments
+    // if Rust ever gets named function arguments we could drop this requirement
 }
 
+/// Button C is a dummy: it renders a button but doesn't handle
+/// its click. Instead, the parent component adds an event listener.
+#[component]
+pub fn ButtonC(cx: Scope) -> impl IntoView {
+    view! { cx, <button>"Toggle Italics"</button> }
+}
+
+/// Button D is very similar to Button A, but instead of passing the setter as a prop
+/// we get it from the context
 #[component]
 pub fn ButtonD(cx: Scope) -> impl IntoView {
-    // use_context searches up the context tree, hoping to
-    // find a `WriteSignal<bool>`
-    // in this case, I .expect() because I know I provided it
-    let setter = use_context::<WriteSignal<bool>>(cx).expect("to have found the setter provided");
+    let setter = use_context::<SmallcapsContext>(cx).unwrap().0;
 
     view! { cx,
-        <button
-            on:click=move |_| setter.update(|value| *value = !*value)
-        >
-          <span>{"Child: "}</span>
-          "Toggle"
-        </button>
+      <button on:click=move |_| setter.update(|value| *value = !*value)>"Toggle Small Caps"</button>
     }
 }
 
 fn main() {
     leptos::mount_to_body(|cx| view! { cx, <App/> })
 }
-
-// The same caveats apply to this as to <ButtonA/>: passing a WriteSignal
-// around should be done with caution, as it allows you to mutate state
-// from arbitrary parts of your code. But when done carefully, this can
-// be one of the most effective techniques for global state management in
-// Leptos: simply provide the state at the highest level you’ll need it,
-// and use it wherever you need it lower down.
-
-// Note that there are no performance downsides to this approach. Because
-// you are passing a fine-grained reactive signal, nothing happens in the
-// intervening components (<Layout/> and <Content/>) when you update it.
-// You are communicating directly between <ButtonD/> and <App/>.
-// In fact—and this is the power of fine-grained reactivity—you are
-// communicating directly between a button click in <ButtonD/> and a
-// single text node in <App/>. It’s as if the components themselves don’t
-// exist at all. And, well... at runtime, they don’t. It’s just signals
-// and effects, all the way down.
