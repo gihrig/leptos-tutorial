@@ -1,50 +1,33 @@
-/* 4.2a Reactivity - Responding to Changes with create_effect */
+/* 4.2b Reactivity - Autotracking and Dynamic Dependencies */
 use leptos::*;
 
-// We’ve made it this far without having mentioned half of the reactive
-// system: effects.
+// If you’re familiar with a framework like React, you might notice one
+// key difference. React and similar frameworks typically require you to
+// pass a “dependency array,” an explicit set of variables that determine
+// when the effect should rerun.
 
-// Reactivity works in two halves: updating individual reactive values
-// (“signals”) notifies the pieces of code that depend on them (“effects”)
-// that they need to run again. These two halves of the reactive system
-// are inter-dependent. Without effects, signals can change within the
-// reactive system but never be observed in a way that interacts with the
-// outside world. Without signals, effects run once but never again, as
-// there’s no observable value to subscribe to. Effects are quite literally
-// “side effects” of the reactive system: they exist to synchronize the
-// reactive system with the non-reactive world outside it.
+// Because Leptos comes from the tradition of synchronous reactive
+// programming, we don’t need this explicit dependency list. Instead, we
+// automatically track dependencies depending on which signals are accessed
+// within the effect.
 
-// Hidden behind the whole reactive DOM renderer that we’ve seen so far is
-// a function called create_effect.
+// This has two effects (no pun intended). Dependencies are:
 
-// create_effect takes a function as its argument. It immediately runs the
-// function. If you access any reactive signal inside that function, it
-// registers the fact that the effect depends on that signal with the
-// reactive runtime. Whenever one of the signals that the effect depends on
-// changes, the effect runs again.
+// 1. Automatic: You don’t need to maintain a dependency list, or worry about
+//    what should or shouldn’t be included. The framework simply tracks
+//    which signals might cause the effect to rerun, and handles it for you.
+// 2. Dynamic: The dependency list is cleared and updated every time the
+//    effect runs. If your effect contains a conditional (for example),
+//    only signals that are used in the current branch are tracked. This
+//    means that effects rerun the absolute minimum number of times.
 
-/*
-  let (a, set_a) = create_signal(cx, 0);
-  let (b, set_b) = create_signal(cx, 0);
-
-
-  create_effect(cx, move |_| {
-    // immediately prints "Value: 0" and subscribes to `a`
-    log::debug!("Value: {}", a());
-  });
-*/
-
-// The effect function is called with an argument containing whatever
-// value it returned the last time it ran. On the initial run, this is
-// None.
-
-// By default, effects do not run on the server. This means you can call
-// browser-specific APIs within the effect function without causing issues.
-// If you need an effect to run on the server, use create_isomorphic_effect.
+// If this sounds like magic, and if you want a deep dive into how
+// automatic dependency tracking works, check out this video.
+// (Apologies for the low volume!)
 
 fn main() {
     leptos::mount_to_body(|cx| {
         view! { cx,
-        <h1>{"Reactivity - Responding to Changes with create_effect"}</h1>}
+        <h1>{"Reactivity - Autotracking and Dynamic Dependencies"}</h1>}
     })
 }
