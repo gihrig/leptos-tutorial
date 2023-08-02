@@ -1,5 +1,5 @@
-/* 3.8b Parent-Child Communication - Callback */
-use leptos::{ev::MouseEvent, *};
+/* 3.8c Parent-Child Communication - Event Listener */
+use leptos::*;
 
 // You can think of your application as a nested tree of components.
 // Each component handles its own local state and manages a section
@@ -24,44 +24,44 @@ use leptos::{ev::MouseEvent, *};
 
 // There are four basic patterns of parent-child communication in Leptos.
 
-// 2. Callback
+// 3. Event Listener
 
-// Another approach would be to pass a callback to the child: say,
-// on_click.
+// You can actually write Option 2 (a Callback) in a slightly different
+// way. If the callback maps directly onto a native DOM event, you can
+// add an `on:` listener directly to the place you use the component in
+// your view macro in <App/>.
 
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
     let (toggled, set_toggled) = create_signal(cx, false);
     view! { cx,
-      <h1>"Parent-Child Communication - Callback"</h1>
+      <h1>"Parent-Child Communication - Event Listener"</h1>
       <p>"Parent: Toggled? " {toggled}</p>
+      // note the on:click instead of on_click
+      // this is the same syntax as an HTML element event listener
       // `*value = !*value` is a simple invert of the boolean `*value`
-      <ButtonB on_click=move |_| set_toggled.update(|value| *value = !*value)/>
+      <ButtonC on:click=move |_| set_toggled.update(|value| *value = !*value)/>
     }
 }
 
 #[component]
-pub fn ButtonB<F>(cx: Scope, on_click: F) -> impl IntoView
-where
-    F: Fn(MouseEvent) + 'static,
-{
+pub fn ButtonC(cx: Scope) -> impl IntoView {
     view! { cx,
       <span>"Child: "</span>
-      <button on:click=on_click>"Toggle"</button>
+      <button>"Toggle"</button>
     }
 }
 fn main() {
     leptos::mount_to_body(|cx| view! { cx, <App/> })
 }
 
-// You’ll notice that whereas <ButtonA/> was given a WriteSignal and
-// decided how to mutate it, <ButtonB/> simply fires an event: the
-// mutation happens back in <App/>. This has the advantage of keeping
-// local state local, preventing the problem of spaghetti mutation.
-// But it also means the logic to mutate that signal needs to exist
-// up in <App/>, not down in <ButtonB/>. These are real trade-offs,
-// not a simple right-or-wrong choice.
+// This lets you write way less code in <ButtonC/> than you did for
+// <ButtonB/>, and still gives a correctly-typed event to the listener.
+// This works by adding an on: event listener to each element that
+// <ButtonC/> returns: in this case, just the one <button>.
 
-// Note the way we declare the generic type F here for the callback.
-// If you’re confused, look back at the generic props section of the
-// chapter on components.
+// Of course, this only works for actual DOM events that you’re passing
+// directly through to the elements you’re rendering in the component.
+// For more complex logic that doesn’t map directly onto an element
+// (say you create <ValidatedForm/> and want an on_valid_form_submit
+// callback) you should use Option 2.
