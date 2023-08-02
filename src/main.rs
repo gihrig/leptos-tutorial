@@ -1,5 +1,5 @@
-/* 3.8a Parent-Child Communication - WriteSignal */
-use leptos::*;
+/* 3.8b Parent-Child Communication - Callback */
+use leptos::{ev::MouseEvent, *};
 
 // You can think of your application as a nested tree of components.
 // Each component handles its own local state and manages a section
@@ -24,40 +24,44 @@ use leptos::*;
 
 // There are four basic patterns of parent-child communication in Leptos.
 
-// 1. WriteSignal
+// 2. Callback
 
-// One approach is simply to pass a WriteSignal from the parent down
-// to the child, and update it in the child. This lets you manipulate
-// the state of the parent from the child.
+// Another approach would be to pass a callback to the child: say,
+// on_click.
 
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
     let (toggled, set_toggled) = create_signal(cx, false);
     view! { cx,
-      <h1>"Parent-Child Communication - WriteSignal"</h1>
+      <h1>"Parent-Child Communication - Callback"</h1>
       <p>"Parent: Toggled? " {toggled}</p>
-      <ButtonA setter=set_toggled/>
+      // `*value = !*value` is a simple invert of the boolean `*value`
+      <ButtonB on_click=move |_| set_toggled.update(|value| *value = !*value)/>
     }
 }
 
 #[component]
-pub fn ButtonA(cx: Scope, setter: WriteSignal<bool>) -> impl IntoView {
+pub fn ButtonB<F>(cx: Scope, on_click: F) -> impl IntoView
+where
+    F: Fn(MouseEvent) + 'static,
+{
     view! { cx,
       <span>"Child: "</span>
-      // `*value = !*value` is a simple invert of the boolean `*value`
-      <button on:click=move |_| setter.update(|value| *value = !*value)>"Toggle"</button>
+      <button on:click=on_click>"Toggle"</button>
     }
 }
 fn main() {
     leptos::mount_to_body(|cx| view! { cx, <App/> })
 }
 
-// This pattern is simple, but you should be careful with it:
-// passing around a WriteSignal can make it hard to reason about
-// your code. In this example, it’s pretty clear when you read
-// <App/> that you are handing off the ability to mutate `toggled`,
-// but it’s not at all clear when or how it will change. In this
-// small, local example it’s easy to understand, but if you find
-// yourself passing around WriteSignals like this throughout your
-// code, you should really consider whether this is making it too
-// easy to write spaghetti code.
+// You’ll notice that whereas <ButtonA/> was given a WriteSignal and
+// decided how to mutate it, <ButtonB/> simply fires an event: the
+// mutation happens back in <App/>. This has the advantage of keeping
+// local state local, preventing the problem of spaghetti mutation.
+// But it also means the logic to mutate that signal needs to exist
+// up in <App/>, not down in <ButtonB/>. These are real trade-offs,
+// not a simple right-or-wrong choice.
+
+// Note the way we declare the generic type F here for the callback.
+// If you’re confused, look back at the generic props section of the
+// chapter on components.
