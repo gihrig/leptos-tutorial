@@ -1,4 +1,4 @@
-/* 3.8c Parent-Child Communication - Event Listener */
+/* 3.8d Parent-Child Communication - Providing a Context */
 use leptos::*;
 
 // You can think of your application as a nested tree of components.
@@ -24,44 +24,180 @@ use leptos::*;
 
 // There are four basic patterns of parent-child communication in Leptos.
 
-// 3. Event Listener
+// 4. Providing a Context
 
-// You can actually write Option 2 (a Callback) in a slightly different
-// way. If the callback maps directly onto a native DOM event, you can
-// add an `on:` listener directly to the place you use the component in
-// your view macro in <App/>.
+// This version is actually a variant on Option 1. Say you have a
+// deeply-nested component tree:
+
+/*
+  #[component]
+  pub fn App(cx: Scope) -> impl IntoView {
+      let (toggled, set_toggled) = create_signal(cx, false);
+      view! { cx,
+          <p>"Toggled? " {toggled}</p>
+          <Layout/>
+      }
+  }
+
+  #[component]
+  pub fn Layout(cx: Scope) -> impl IntoView {
+      view! { cx,
+          <header>
+              <h1>"My Page"</h1>
+          </header>
+          <main>
+              <Content/>
+          </main>
+      }
+  }
+
+  #[component]
+  pub fn Content(cx: Scope) -> impl IntoView {
+      view! { cx,
+          <div class="content">
+              <ButtonD/>
+          </div>
+      }
+  }
+
+  #[component]
+  pub fn ButtonD<F>(cx: Scope) -> impl IntoView {
+      todo!()
+  }
+*/
+
+// Now <ButtonD/> is no longer a direct child of <App/>, so you can’t
+// simply pass your WriteSignal to its props. You could do what’s
+// sometimes called “prop drilling,” adding a prop to each layer between
+// the two:
+
+/*
+  #[component]
+  pub fn App(cx: Scope) -> impl IntoView {
+      let (toggled, set_toggled) = create_signal(cx, false);
+      view! { cx,
+          <p>"Toggled? " {toggled}</p>
+          <Layout set_toggled/>
+      }
+  }
+
+  #[component]
+  pub fn Layout(cx: Scope, set_toggled: WriteSignal<bool>) -> impl IntoView {
+      view! { cx,
+          <header>
+              <h1>"My Page"</h1>
+          </header>
+          <main>
+              <Content set_toggled/>
+          </main>
+      }
+  }
+
+  #[component]
+  pub fn Content(cx: Scope, set_toggled: WriteSignal<bool>) -> impl IntoView {
+      view! { cx,
+          <div class="content">
+              <ButtonD set_toggled/>
+          </div>
+      }
+  }
+
+  #[component]
+  pub fn ButtonD<F>(cx: Scope, set_toggled: WriteSignal<bool>) -> impl IntoView {
+      todo!()
+  }
+*/
+
+// This is a mess! <Layout/> and <Content/> don’t need set_toggled; they
+// just pass it through to <ButtonD/>. But I need to declare the prop in
+// triplicate. This is not only annoying but hard to maintain: imagine
+// we add a “half-toggled” option and the type of set_toggled needs to
+// change to an enum. We have to change it in three places!
+
+// Isn’t there some way to skip levels?
+
+// There is!
+
+// The Context API
+
+// You can provide data that skips levels by using provide_context and
+// use_context. Contexts are identified by the type of the data you
+// provide (in this example, WriteSignal<bool>), and they exist in a
+// top-down tree that follows the contours of your UI tree. In this
+// example, we can use context to skip the unnecessary prop drilling.
 
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
     let (toggled, set_toggled) = create_signal(cx, false);
+
+    // share `set_toggled` with all children of this component
+    provide_context(cx, set_toggled);
+
     view! { cx,
-      <h1>"Parent-Child Communication - Event Listener"</h1>
-      <p>"Parent: Toggled? " {toggled}</p>
-      // note the on:click instead of on_click
-      // this is the same syntax as an HTML element event listener
-      // `*value = !*value` is a simple invert of the boolean `*value`
-      <ButtonC on:click=move |_| set_toggled.update(|value| *value = !*value)/>
+        <h1>"Parent-Child Communication - Providing a Context"</h1>
+        <strong>"Parent: "</strong>
+        <span>"Toggled? " {toggled}</span>
+        <Layout/>
+    }
+}
+
+// <Layout/> and <Content/> no longer pass `set_toggled`
+#[component]
+pub fn Layout(cx: Scope) -> impl IntoView {
+    view! { cx,
+        <header>
+            <h4>"Layout..."</h4>
+        </header>
+        <main>
+            <Content/>
+        </main>
     }
 }
 
 #[component]
-pub fn ButtonC(cx: Scope) -> impl IntoView {
+pub fn Content(cx: Scope) -> impl IntoView {
     view! { cx,
-      <span>"Child: "</span>
-      <button>"Toggle"</button>
+        <div class="content">
+          <h4>"Content..."</h4>
+          <ButtonD/>
+        </div>
     }
 }
+
+#[component]
+pub fn ButtonD(cx: Scope) -> impl IntoView {
+    // use_context searches up the context tree, hoping to
+    // find a `WriteSignal<bool>`
+    // in this case, I .expect() because I know I provided it
+    let setter = use_context::<WriteSignal<bool>>(cx).expect("to have found the setter provided");
+
+    view! { cx,
+        <button
+            on:click=move |_| setter.update(|value| *value = !*value)
+        >
+          <span>{"Child: "}</span>
+          "Toggle"
+        </button>
+    }
+}
+
 fn main() {
     leptos::mount_to_body(|cx| view! { cx, <App/> })
 }
 
-// This lets you write way less code in <ButtonC/> than you did for
-// <ButtonB/>, and still gives a correctly-typed event to the listener.
-// This works by adding an on: event listener to each element that
-// <ButtonC/> returns: in this case, just the one <button>.
+// The same caveats apply to this as to <ButtonA/>: passing a WriteSignal
+// around should be done with caution, as it allows you to mutate state
+// from arbitrary parts of your code. But when done carefully, this can
+// be one of the most effective techniques for global state management in
+// Leptos: simply provide the state at the highest level you’ll need it,
+// and use it wherever you need it lower down.
 
-// Of course, this only works for actual DOM events that you’re passing
-// directly through to the elements you’re rendering in the component.
-// For more complex logic that doesn’t map directly onto an element
-// (say you create <ValidatedForm/> and want an on_valid_form_submit
-// callback) you should use Option 2.
+// Note that there are no performance downsides to this approach. Because
+// you are passing a fine-grained reactive signal, nothing happens in the
+// intervening components (<Layout/> and <Content/>) when you update it.
+// You are communicating directly between <ButtonD/> and <App/>.
+// In fact—and this is the power of fine-grained reactivity—you are
+// communicating directly between a button click in <ButtonD/> and a
+// single text node in <App/>. It’s as if the components themselves don’t
+// exist at all. And, well... at runtime, they don’t. It’s just signals
+// and effects, all the way down.
