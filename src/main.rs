@@ -1,186 +1,104 @@
-/* 4.2f Reactivity - Final Example */
+/* 4.3 Reactivity - Reactivity and Functions */
 
-use leptos::html::Input;
 use leptos::*;
 
-#[component]
-fn App(cx: Scope) -> impl IntoView {
-    // Just making a visible log here
-    // You can ignore this...
-    let log = create_rw_signal::<Vec<String>>(cx, vec![]);
-    let logged = move || log().join("\n");
-    provide_context(cx, log);
+// One of our core contributors said to me recently: “I never used
+// closures this often until I started using Leptos.” And it’s true.
+// Closures are at the heart of any Leptos application. It sometimes
+// looks a little silly:
 
-    view! { cx,
-        <CreateAnEffect/>
-        <pre>{logged}</pre>
-    }
-}
-
-#[component]
-fn CreateAnEffect(cx: Scope) -> impl IntoView {
-    let (first, set_first) = create_signal(cx, String::new());
-    let (last, set_last) = create_signal(cx, String::new());
-    let (use_last, set_use_last) = create_signal(cx, true);
-
-    // this will add the name to the log
-    // any time one of the source signals changes
-    create_effect(cx, move |_| {
-        log(
-            cx,
-            if use_last() {
-                format!("{}  {}", first(), last())
-            } else {
-                first()
-            },
-        )
-    });
-
-    view! { cx,
-        <h1><code>"create_effect"</code> " Version"</h1>
-        <form>
-            <label>
-                "First Name"
-                <input type="text" name="first" prop:value=first
-                    on:change=move |ev| set_first(event_target_value(&ev))
-                />
-            </label>
-            <label>
-                "Last Name"
-                <input type="text" name="last" prop:value=last
-                    on:change=move |ev| set_last(event_target_value(&ev))
-                />
-            </label>
-            <label>
-                "Show Last Name"
-                <input type="checkbox" name="use_last" prop:checked=use_last
-                    on:change=move |ev| set_use_last(event_target_checked(&ev))
-                />
-            </label>
-        </form>
-    }
-}
-
-#[component]
-fn ManualVersion(cx: Scope) -> impl IntoView {
-    let first = create_node_ref::<Input>(cx);
-    let last = create_node_ref::<Input>(cx);
-    let use_last = create_node_ref::<Input>(cx);
-
-    let mut prev_name = String::new();
-    let on_change = move |_| {
-        log(cx, "      listener");
-        let first = first.get().unwrap();
-        let last = last.get().unwrap();
-        let use_last = use_last.get().unwrap();
-        let this_one = if use_last.checked() {
-            format!("{} {}", first.value(), last.value())
-        } else {
-            first.value()
-        };
-
-        if this_one != prev_name {
-            log(cx, &this_one);
-            prev_name = this_one;
-        }
-    };
-
-    view! { cx,
-        <h1>"Manual Version"</h1>
-        <form on:change=on_change>
-            <label>
-                "First Name"
-                <input type="text" name="first"
-                    node_ref=first
-                />
-            </label>
-            <label>
-                "Last Name"
-                <input type="text" name="last"
-                    node_ref=last
-                />
-            </label>
-            <label>
-                "Show Last Name"
-                <input type="checkbox" name="use_last"
-                    checked
-                    node_ref=use_last
-                />
-            </label>
-        </form>
-    }
-}
-
-#[component]
-fn EffectVsDerivedSignal(cx: Scope) -> impl IntoView {
-    let (my_value, set_my_value) = create_signal(cx, String::new());
-    // Don't do this.
-    /*let (my_optional_value, set_optional_my_value) = create_signal(cx, Option::<String>::None);
-
-    create_effect(cx, move |_| {
-        if !my_value.get().is_empty() {
-            set_optional_my_value(Some(my_value.get()));
-        } else {
-            set_optional_my_value(None);
-        }
-    });*/
-
-    // Do this
-    let my_optional_value =
-        move || (!my_value.with(String::is_empty)).then(|| Some(my_value.get()));
-
-    view! { cx,
-        <input
-            prop:value=my_value
-            on:input= move |ev| set_my_value(event_target_value(&ev))
-        />
-
-        <p>
-            <code>"my_optional_value"</code>
-            " is "
-            <code>
-                <Show
-                    when=move || my_optional_value().is_some()
-                    fallback=|_cx| view! { cx, "None" }
-                >
-                    "Some(\"" {my_optional_value().unwrap()} "\")"
-                </Show>
-            </code>
-        </p>
-    }
-}
-
+// a signal holds a value, and can be updated
 /*
-#[component]
-pub fn Show<F, W, IV>(
-    /// The scope the component is running in
-    cx: Scope,
-    /// The components Show wraps
-    children: Box<dyn Fn(Scope) -> Fragment>,
-    /// A closure that returns a bool that determines whether this thing runs
-    when: W,
-    /// A closure that returns what gets rendered if the when statement is false
-    fallback: F,
-) -> impl IntoView
-where
-    W: Fn() -> bool + 'static,
-    F: Fn(Scope) -> IV + 'static,
-    IV: IntoView,
-{
-    let memoized_when = create_memo(cx, move |_| when());
-
-    move || match memoized_when.get() {
-        true => children(cx).into_view(cx),
-        false => fallback(cx).into_view(cx),
-    }
-}
+  let (count, set_count) = create_signal(cx, 0);
 */
 
-fn log(cx: Scope, msg: impl std::fmt::Display) {
-    let log = use_context::<RwSignal<Vec<String>>>(cx).unwrap();
-    log.update(|log| log.push(msg.to_string()));
-}
+// a derived signal is a function that accesses other signals
+/*
+  let double_count = move || count() * 2;
+  let count_is_odd = move || count() & 1 == 1;
+  let text = move || if count_is_odd() {
+    "odd"
+  } else {
+    "even"
+  };
+*/
+
+// an effect automatically tracks the signals it depends on
+// and reruns when they change
+/*
+  create_effect(cx, move |_| {
+    log!("text = {}", text());
+  });
+
+  view! { cx,
+    <p>{move || text().to_uppercase()}</p>
+  }
+*/
+
+// Closures, closures everywhere!
+
+// But why?
+// Functions and UI Frameworks
+
+// Functions are at the heart of every UI framework. And this makes
+// perfect sense. Creating a user interface is basically divided into
+// two phases:
+
+//  initial rendering
+//  updates
+
+// In a web framework, the framework does some kind of initial rendering.
+// Then it hands control back over to the browser. When certain events
+// fire (like a mouse click) or asynchronous tasks finish (like an HTTP
+// request finishing), the browser wakes the framework back up to update
+// something. The framework runs some kind of code to update your user
+// interface, and goes back asleep until the browser wakes it up again.
+
+// The key phrase here is “runs some kind of code.” The natural way to
+// “run some kind of code” at an arbitrary point in time—in Rust or in
+// any other programming language—is to call a function. And in fact
+// every UI framework is based on rerunning some kind of function over
+// and over:
+
+//  virtual DOM (VDOM) frameworks like React, Yew, or Dioxus rerun a component or render function over and over, to generate a virtual DOM tree that can be reconciled with the previous result to patch the DOM
+//  compiled frameworks like Angular and Svelte divide your component templates into “create” and “update” functions, rerunning the update function when they detect a change to the component’s state
+//  in fine-grained reactive frameworks like SolidJS, Sycamore, or Leptos, you define the functions that rerun
+
+// That’s what all our components are doing.
+
+// Take our typical <SimpleCounter/> example in its simplest form:
+/*
+  #[component]
+  pub fn SimpleCounter(cx: Scope) -> impl IntoView {
+    let (value, set_value) = create_signal(cx, 0);
+
+    let increment = move |_| set_value.update(|value| *value += 1);
+
+    view! { cx,
+      <button on:click=increment>
+      {value}
+      </button>
+    }
+  }
+*/
+
+// The SimpleCounter function itself runs once. The value signal is
+// created once. The framework hands off the increment function to the
+// browser as an event listener. When you click the button, the browser
+// calls increment, which updates value via set_value. And that updates
+// the single text node represented in our view by {value}.
+
+// Closures are key to reactivity. They provide the framework with the
+// ability to rerun the smallest possible unit of your application in
+// response to a change.
+
+// So remember two things:
+
+// 1. Your component function is a setup function, not a render function:
+//    it only runs once.
+// 2. For values in your view template to be reactive, they must be
+//    functions: either signals (which implement the Fn traits) or closures.
 
 fn main() {
-    leptos::mount_to_body(|cx| view! { cx, <App/> })
+    leptos::mount_to_body(|cx| view! { cx, <h1>"Reactivity - Reactivity and Functions"</h1> })
 }
