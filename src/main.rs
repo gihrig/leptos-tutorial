@@ -1,187 +1,177 @@
-/* 5 Testing */
+/* 6.1 Async - Loading Data with Resources */
 
-use leptos::*;
+// Working with async
 
-// ----------------------------------------------------------------
-// ---> Pseudo code, many errors below <---
-// ----------------------------------------------------------------
+// So far we’ve only been working with synchronous user interfaces:
+// You provide some input, the app immediately processes it and updates
+// the interface. This is great, but is a tiny subset of what web
+// applications do. In particular, most web apps have to deal with some
+// kind of asynchronous data loading, usually loading something from an
+// API.
 
-// Testing Your Components
+// Asynchronous data is notoriously hard to integrate with the
+// synchronous parts of your code. Leptos provides a cross-platform
+// `spawn_local` function that makes it easy to run a Future, but
+// there’s much more to it than that.
+// See: https://docs.rs/leptos/latest/leptos/fn.spawn_local.html
 
-// Testing user interfaces can be relatively tricky, but really
-// important. This article will discuss a couple principles and
-// approaches for testing a Leptos app.
+// In this chapter, we’ll see how Leptos helps smooth out that process
+// for you.
 
-// 1. Test business logic with ordinary Rust tests
+// ------------------------------------------------------------------
 
-// In many cases, it makes sense to pull the logic out of your
-// components and test it separately. For some simple components,
-// there’s no particular logic to test, but for many it’s worth
-// using a testable wrapping type and implementing the logic in
-// ordinary Rust impl blocks.
+// Loading Data with Resources
 
-// For example, instead of embedding logic in a component directly
-// like this:
+// A Resource is a reactive data structure that reflects the current
+// state of an asynchronous task, allowing you to integrate asynchronous
+// Futures into the synchronous reactive system. Rather than waiting
+// for its data to load with .await, you transform the Future into a
+// signal that returns Some(T) if it has resolved, and None if it’s
+// still pending.
+// See: https://docs.rs/leptos/latest/leptos/struct.Resource.html
 
-#[component]
-pub fn TodoApp(cx: Scope) -> impl IntoView {
-    let (todos, set_todos) = create_signal(cx, vec![Todo { /* ... */ }]);
-    // ⚠️ this is hard to test because it's embedded in the component
-    let num_remaining =
-        move || todos.with(|todos| todos.iter().filter(|todo| !todo.completed).sum());
-}
+// You do this by using the `create_resource` function. This takes two
+// arguments (other than the ubiquitous cx):
 
-// You could pull that logic out into a separate data structure and
-// test it:
+// 1. a source signal, which will generate a new Future whenever it changes
+// 2. a fetcher function, which takes the data from that signal and
+//    returns a Future
 
-pub struct Todos(Vec<Todo>);
-
-impl Todos {
-    pub fn num_remaining(&self) -> usize {
-        todos.iter().filter(|todo| !todo.completed).sum()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_remaining() {
-        // ...
-    }
-}
-
-#[component]
-pub fn TodoApp(cx: Scope) -> impl IntoView {
-    let (todos, set_todos) = create_signal(cx, Todos(vec![Todo { /* ... */ }]));
-    // ✅ this has a test associated with it
-    let num_remaining = move || todos.with(Todos::num_remaining);
-}
-
-// In general, the less of your logic is wrapped into your components
-// themselves, the more idiomatic your code will feel and the easier
-// it will be to test.
-
-// 2. Test components with wasm-bindgen-test
-
-// wasm-bindgen-test is a great utility for integrating or end-to-end
-// testing WebAssembly apps in a headless browser.
-// See https://crates.io/crates/wasm-bindgen-test for more details.
-
-// To use this testing utility, you need to add wasm-bindgen-test to
-// your Cargo.toml:
+// Here’s an example
 /*
-  [dev-dependencies]
-  wasm-bindgen-test = "0.3.0"
+  // our source signal: some synchronous, local state
+  let (count, set_count) = create_signal(cx, 0);
+
+  // our resource
+  let async_data = create_resource(cx,
+    count,
+    // every time `count` changes, this will run
+    |value| async move {
+      log!("loading data from API");
+      load_data(value).await
+    },
+  );
 */
 
-// You should create tests in a separate tests directory. You can then
-// run your tests in the browser of your choice:
+// To create a resource that simply runs once, you can pass a
+// non-reactive, empty source signal:
 /*
-  wasm-pack test --firefox
+  let once = create_resource(cx, || (), |_| async move {
+    load_data().await
+  });
 */
 
-// To see the full setup, check out the tests for the counter example.
-// See: https://github.com/leptos-rs/leptos/tree/main/examples/counter
+// To access the value you can use `.read(cx)` or
+// `.with(cx, |data| /* */)`.
+// These work just like `.get()` and `.with()` on a signal. `read` clones
+// the value and returns it, `with` applies a closure to it.
+// But there are two differences:
 
-// Writing Your Tests
+// 1. For any `Resource<_, T>`, they always return `Option<T>`, not `T:`
+//    because it’s always possible that your resource is still loading.
+// 2. They take a Scope argument. You’ll see why in the next chapter, on
+//    `<Suspense/>`.
 
-// Most tests will involve some combination of vanilla DOM manipulation
-// and comparison to a view. For example, here’s a test for the counter
-// example.
+// So, you can show the current state of a resource in your view:
+/*
+  let once = create_resource(cx, || (), |_| async move {
+    load_data().await
+  });
+  view! { cx,
+      <h1>"My Data"</h1>
+      {move || match once.read(cx) {
+          None => view! { cx, <p>"Loading..."</p> }.into_view(cx),
+          Some(data) => view! { cx, <ShowData data/> }.into_view(cx)
+      }}
+  }
+*/
 
-// First, we set up the testing environment.
+// Resources also provide a `refetch()` method that allows you to
+// manually reload the data (for example, in response to a button
+// click) and a `loading()` method that returns a `ReadSignal<bool>`
+// indicating whether the resource is currently loading or not.
 
-use counter::*;
+// -----------------------------------------------------------------
+// 6.1 Async - Loading Data with Resources - Example
+// -----------------------------------------------------------------
+use gloo_timers::future::TimeoutFuture;
 use leptos::*;
-use wasm_bindgen_test::*;
-use web_sys::HtmlElement;
 
-// tell the test runner to run tests in the browser
-wasm_bindgen_test_configure!(run_in_browser);
-
-// I’m going to create a simpler wrapper for each test case, and mount
-// it there. This makes it easy to encapsulate the test results.
-
-// like marking a regular test with #[test]
-#[wasm_bindgen_test]
-fn clear() {
-    let document = leptos::document();
-    let test_wrapper = document.create_element("section").unwrap();
-    document.body().unwrap().append_child(&test_wrapper);
-
-    // start by rendering our counter and mounting it to the DOM
-    // note that we start at the initial value of 10
-    mount_to(
-        test_wrapper.clone().unchecked_into(),
-        |cx| view! { cx, <SimpleCounter initial_value=10 step=1/> },
-    );
-
-    // We’ll use some manual DOM operations to grab the <div> that wraps
-    // the whole component, as well as the `clear` button.
-
-    // now we extract the buttons by iterating over the DOM
-    // this would be easier if they had IDs
-    let div = test_wrapper.query_selector("div").unwrap().unwrap();
-    let clear = test_wrapper
-        .query_selector("button")
-        .unwrap()
-        .unwrap()
-        .unchecked_into::<web_sys::HtmlElement>();
-
-    // Now we can use ordinary DOM APIs to simulate user interaction.
-
-    // now let's click the `clear` button
-    clear.click();
+// Here we define an async function
+// This could be anything: a network request, database read, etc.
+// Here, we just multiply a number by 10
+async fn load_data(value: i32) -> i32 {
+    // fake a one-second delay
+    TimeoutFuture::new(1_000).await;
+    value * 10
 }
 
-// You can test individual DOM element attributes or text node values.
-// Sometimes I like to test the whole view at once. We can do this by
-// testing the element’s outerHTML against our expectations.
+#[component]
+fn App(cx: Scope) -> impl IntoView {
+    // this count is our synchronous, local state
+    let (count, set_count) = create_signal(cx, 0);
 
-assert_eq!(
-    div.outer_html(),
-    // here we spawn a mini reactive system to render the test case
-    run_scope(create_runtime(), |cx| {
-        // it's as if we're creating it with a value of 0, right?
-        let (value, set_value) = create_signal(cx, 0);
-
-        // we can remove the event listeners because they're not rendered to HTML
-        view! { cx,
-            <div>
-                <button>"Clear"</button>
-                <button>"-1"</button>
-                <span>"Value: " {value} "!"</span>
-                <button>"+1"</button>
-            </div>
-        }
-        // the view returned an HtmlElement<Div>, which is a smart
-        // pointer for a DOM element. So we can still just call
-        // .outer_html()
-        .outer_html()
-    })
-);
-
-// That test involved us manually replicating the view that’s inside
-// the component. There's actually an easier way to do this... We can
-// just test against a <SimpleCounter/> with the initial value 0.
-// This is where our wrapping element comes in: I’ll just test the
-// wrapper’s innerHTML against another comparison case.
-
-assert_eq!(test_wrapper.inner_html(), {
-    let comparison_wrapper = document.create_element("section").unwrap();
-    leptos::mount_to(
-        comparison_wrapper.clone().unchecked_into(),
-        |cx| view! { cx, <SimpleCounter initial_value=0 step=1/>},
+    // create_resource takes two arguments after its scope
+    let async_data = create_resource(
+        cx,
+        // the first is the "source signal"
+        count,
+        // the second is the loader
+        // it takes the source signal's value as its argument
+        // and does some async work
+        |value| async move { load_data(value).await },
     );
-    comparison_wrapper.inner_html()
-});
+    // whenever the source signal changes, the loader reloads
 
-// This is only a very limited introduction to testing. But I hope
-// it’s useful as you begin to build applications.
+    // you can also create resources that only load once
+    // just return the unit type () from the source signal
+    // that doesn't depend on anything: we just load it once
+    let stable =
+        create_resource(cx, || (), |_| async move { load_data(1).await });
 
-// For more, see the testing section of the wasm-bindgen guide.
-// See: https://rustwasm.github.io/wasm-bindgen/wasm-bindgen-test/index.html#testing-on-wasm32-unknown-unknown-with-wasm-bindgen-test
+    // we can access the resource values with .read()
+    // this will reactively return None before the Future has resolved
+    // and update to Some(T) when it has resolved
+    let async_result = move || {
+        async_data
+            .read(cx)
+            .map(|value| format!("Server returned {value:?}"))
+            // This loading state will only show before the first load
+            .unwrap_or_else(|| "Loading...".into())
+    };
+
+    // the resource's loading() method gives us a
+    // signal to indicate whether it's currently loading
+    let loading = async_data.loading();
+    let is_loading = move || if loading() { "Loading..." } else { "Idle." };
+
+    view! { cx,
+        <button on:click=move |_| {
+            set_count.update(|n| *n += 1);
+        }>
+
+            "Click me"
+        </button>
+        <p>
+            <code>"stable"</code>
+            ": "
+            {move || stable.read(cx)}
+        </p>
+        <p>
+            <code>"count"</code>
+            ": "
+            {count}
+        </p>
+        <p>
+            <code>"async_value"</code>
+            ": "
+            {async_result}
+            <br/>
+            {is_loading}
+        </p>
+    }
+}
 
 fn main() {
-    leptos::mount_to_body(|cx| view! { cx, <h1>"Testing"</h1> })
+    leptos::mount_to_body(|cx| view! { cx, <App/> })
 }
