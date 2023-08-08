@@ -1,4 +1,4 @@
-/* 6.2 Async - Suspense */
+/* 6.3 Async - <Transition> */
 
 // Working with async
 
@@ -20,138 +20,94 @@
 
 // ------------------------------------------------------------------
 
-// <Suspense>
+// <Transition>
 
-// In the previous chapter, we showed how you can create a simple loading
-// screen to show some fallback while a resource is loading.
+// You’ll notice in the <Suspense/> example that if you keep reloading
+// the data, it keeps flickering back to "Loading...". Sometimes this
+// is fine. For other times, there’s <Transition/>.
 
-/*
-  let (count, set_count) = create_signal(cx, 0);
-  let a = create_resource(cx, count, |count| async move { load_a(count).await });
+// <Transition/> behaves exactly the same as <Suspense/>, but instead
+// of falling back every time, it only shows the fallback the first
+// time. On all subsequent loads, it continues showing the old data
+// until the new data are ready. This can be really handy to prevent
+// the flickering effect, and to allow users to continue interacting
+// with your application.
 
-  view! { cx,
-    <h1>"My Data"</h1>
-    {move || match once.read(cx) {
-      None => view! { cx, <p>"Loading..."</p> }.into_view(cx),
-      Some(data) => view! { cx, <ShowData data/> }.into_view(cx)
-    }}
-  }
-*/
+// This example shows how you can create a simple tabbed contact list
+// with <Transition/>. When you select a new tab, it continues showing
+// the current contact until the new data loads. This can be a much
+// better user experience than constantly falling back to a loading
+// message.
 
-// But what if we have two resources, and want to wait for both of them?
-
-/*
-  let (count, set_count) = create_signal(cx, 0);
-  let (count2, set_count2) = create_signal(cx, 0);
-  let a = create_resource(cx, count, |count| async move { load_a(count).await });
-  let b = create_resource(cx, count2, |count| async move { load_b(count).await });
-
-  view! { cx,
-    <h1>"My Data"</h1>
-    {move || match (a.read(cx), b.read(cx)) {
-      (Some(a), Some(b)) => view! { cx,
-        <ShowA a/>
-        <ShowA b/>
-      }.into_view(cx),
-      _ => view! { cx, <p>"Loading..."</p> }.into_view(cx)
-    }}
-  }
-*/
-
-// That’s not so bad, but it’s kind of annoying. What if we could invert
-// the flow of control?
-
-// The <Suspense/> component lets us do exactly that. You give it a
-// fallback prop and children, one or more of which usually involves
-// reading from a resource. Reading from a resource “under” a <Suspense/>
-// (i.e., in one of its children) registers that resource with the
-// <Suspense/>. If it’s still waiting for resources to load, it shows
-// the fallback. When they’ve all loaded, it shows the children.
-
-/*
-  let (count, set_count) = create_signal(cx, 0);
-  let (count2, set_count2) = create_signal(cx, 0);
-  let a = create_resource(cx, count, |count| async move { load_a(count).await });
-  let b = create_resource(cx, count2, |count| async move { load_b(count).await });
-
-  view! { cx,
-    <h1>"My Data"</h1>
-    <Suspense
-    fallback=move || view! { cx, <p>"Loading..."</p> }
-    >
-    <h2>"My Data"</h2>
-    <h3>"A"</h3>
-    {move || {
-      a.read(cx)
-      .map(|a| view! { cx, <ShowA a/> })
-    }}
-    <h3>"B"</h3>
-    {move || {
-      b.read(cx)
-      .map(|b| view! { cx, <ShowB b/> })
-    }}
-    </Suspense>
-  }
-*/
-
-// Every time one of the resources is reloading, the "Loading..."
-// fallback will show again.
-
-// This inversion of the flow of control makes it easier to add or
-// remove individual resources, as you don’t need to handle the matching
-// yourself. It also unlocks some massive performance improvements
-// during server-side rendering, which we’ll talk about during a later
-// chapter.
-
-// ----------------------------------------------------------------
-// 6.2 Async - Suspense - Example
-// ----------------------------------------------------------------
+// --------------------------------------------------------------------
+// 6.3 Async - <Transition> - Final Example
+// --------------------------------------------------------------------
 
 use gloo_timers::future::TimeoutFuture;
 use leptos::*;
 
-async fn ucase_api_call(name: String, delay: u32) -> String {
-    TimeoutFuture::new(delay).await;
-    name.to_ascii_uppercase()
-}
-
-async fn lcase_api_call(name: String, delay: u32) -> String {
-    TimeoutFuture::new(delay).await;
-    name.to_ascii_lowercase()
+async fn important_api_call(id: usize) -> String {
+    TimeoutFuture::new(1_000).await;
+    match id {
+        0 => "Alice",
+        1 => "Bob",
+        2 => "Carol",
+        _ => "User not found",
+    }
+    .to_string()
 }
 
 #[component]
 fn App(cx: Scope) -> impl IntoView {
-    let (name, set_name) = create_signal(cx, "Bill".to_string());
+    let (tab, set_tab) = create_signal(cx, 0);
 
-    // this will reload every time `name` changes
-    let async_udata = create_resource(cx, name, |name| async move {
-        ucase_api_call(name, 1000).await
-    });
-    let async_ldata = create_resource(cx, name, |name| async move {
-        lcase_api_call(name, 1500).await
-    });
+    // this will reload every time `tab` changes
+    let user_data =
+        create_resource(
+            cx,
+            tab,
+            |tab| async move { important_api_call(tab).await },
+        );
 
     view! { cx,
-        <input
-            on:input=move |ev| {
-                set_name(event_target_value(&ev));
-            }
+        <div class="buttons">
+            <button
+                on:click=move |_| set_tab(0)
+                class:selected=move || tab() == 0
+            >
+                "Tab A"
+            </button>
+            <button
+                on:click=move |_| set_tab(1)
+                class:selected=move || tab() == 1
+            >
+                "Tab B"
+            </button>
+            <button
+                on:click=move |_| set_tab(2)
+                class:selected=move || tab() == 2
+            >
+                "Tab C"
+            </button>
+            // Shows "Loading..." on page load and transition
+            // Seems to defeat the stated purpose of <Transition/>
+            // {move || if user_data.loading().get() { "Loading..." } else { "" }}
+        </div>
+        // Transition seems to be broken in this example.
+        // It works as expected in `hackernews` and `hackernews_axum`
+        // examples
 
-            prop:value=name
-        />
-        <p>
-            <code>"name:"</code>
-            {name}
-        </p>
-        // the fallback will show whenever a resource
-        // read "under" the suspense is loading
-        <Suspense fallback=move || view! { cx, <p>"Loading..."</p> }>
-            // the children will be rendered once initially,
-            // and then whenever all resources have been resolved
-            <p>"Your shouting name is " {move || async_udata.read(cx)}</p>
-            <p>"Your quiet name is " {move || async_ldata.read(cx)}</p>
-        </Suspense>
+        // The <Transition fallback never shows ???
+        // Does not perform as discussed above. It does not "show
+        // initially".
+        // The second feature "subsequent reloads, the current child will
+        // continue showing" does function as expected.
+        // fallback seems to be useless. Might as well be disabled.
+        // `fallback=move || {}`
+        <Transition
+        fallback=move || {view! { cx, <p>"Loading..."</p> }}>
+            <p>{move || user_data.read(cx)}</p>
+        </Transition>
     }
 }
 
