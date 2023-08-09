@@ -1,221 +1,226 @@
-/* 6.4 Async - Actions */
+/* 7.0 Projecting Children */
 
-// Working with async
+// As you build components you may occasionally find yourself wanting
+// to “project” children through multiple layers of components.
 
-// So far we’ve only been working with synchronous user interfaces:
-// You provide some input, the app immediately processes it and updates
-// the interface. This is great, but is a tiny subset of what web
-// applications do. In particular, most web apps have to deal with some
-// kind of asynchronous data loading, usually loading something from an
-// API.
+// The Problem
 
-// Asynchronous data is notoriously hard to integrate with the
-// synchronous parts of your code. Leptos provides a cross-platform
-// `spawn_local` function that makes it easy to run a Future, but
-// there’s much more to it than that.
-// See: https://docs.rs/leptos/latest/leptos/fn.spawn_local.html
-
-// In this chapter, we’ll see how Leptos helps smooth out that process
-// for you.
-
-// ------------------------------------------------------------------
-
-// Mutating Data with Actions
-
-// We’ve talked about how to load async data with resources. Resources
-// immediately load data and work closely with <Suspense/> and
-// <Transition/> components to show whether data is loading in your app.
-// But what if you just want to call some arbitrary async function and
-// keep track of what it’s doing?
-
-// Well, you could always use spawn_local.
-// https://docs.rs/leptos/latest/leptos/fn.spawn_local.html
-// This allows you to just spawn an async task in a synchronous
-// environment by handing the Future off to the browser (or, on the
-// server, Tokio or whatever other runtime you’re using). But how do
-// you know if it’s still pending? Well, you could just set a signal
-// to show whether it’s loading, and another one to show the result...
-
-// All of this is true. Or you could use the final async primitive:
-// create_action.
-// https://docs.rs/leptos/latest/leptos/fn.create_action.html
-
-// Actions and resources seem similar, but they represent fundamentally
-// different things. If you’re trying to load data by running an async
-// function, either once or when some other value changes, you probably
-// want to use `create_resource`. If you’re trying to occasionally run
-// an async function in response to something like a user clicking a
-// button, you probably want to use `create_action`.
-
-// Say we have some async function we want to run.
+// Consider the following:
 
 /*
-  async fn add_todo_request(new_title: &str) -> Uuid {
-      /* do some stuff on the server to add a new todo */
-  }
-*/
-
-// create_action takes a reactive Scope and an async function that
-// takes a reference to a single argument, which you could think of
-// as its “input type.”
-
-// The input is always a single type. If you want to pass in multiple
-// arguments, you can do it with a struct or tuple.
-
-/*
-  // if there's a single argument, just use that
-  let action1 = create_action(cx, |input: &String| {
-    let input = input.clone();
-    async move { todo!() }
-  });
-
-  // if there are no arguments, use the unit type `()`
-  let action2 = create_action(cx, |input: &()| async { todo!() });
-
-  // if there are multiple arguments, use a tuple
-  let action3 = create_action(cx,
-    |input: &(usize, String)| async { todo!() }
-  );
-*/
-
-// Because the action function takes a reference but the Future needs
-// to have a 'static lifetime, you’ll usually need to clone the value
-// to pass it into the Future. This is admittedly awkward but it
-// unlocks some powerful features like optimistic UI. We’ll see a
-// little more about that in future chapters.
-
-// So in this case, all we need to do to create an action is
-
-/*
-  let add_todo_action = create_action(cx, |input: &String| {
-    let input = input.to_owned();
-    async move { add_todo_request(&input).await }
-  });
-*/
-
-// Rather than calling add_todo_action directly, we’ll call it with
-// .dispatch(), as in
-
-/*
-  add_todo_action.dispatch("Some value".to_string());
-*/
-
-// You can do this from an event listener, a timeout, or anywhere;
-// because .dispatch() isn’t an async function, it can be called from
-// a synchronous context.
-
-// Actions provide access to a few signals that synchronize between
-// the asynchronous action you’re calling and the synchronous reactive
-// system:
-
-/*
-  let submitted = add_todo_action.input(); // RwSignal<Option<String>>
-  let pending = add_todo_action.pending(); // ReadSignal<bool>
-  let todo_id = add_todo_action.value(); // RwSignal<Option<Uuid>>
-*/
-
-// This makes it easy to track the current state of your request, show
-// a loading indicator, or do “optimistic UI” based on the assumption
-// that the submission will succeed.
-
-/*
-  let input_ref = create_node_ref::<Input>(cx);
-
-  view! { cx,
-      <form
-          on:submit=move |ev| {
-              ev.prevent_default(); // don't reload the page...
-              let input = input_ref.get().expect("input to exist");
-              add_todo_action.dispatch(input.value());
-          }
+  pub fn LoggedIn<F, IV>(
+    cx: Scope,
+    fallback: F,
+    children: ChildrenFn
+  ) -> impl IntoView
+  where
+  F: Fn(Scope) -> IV + 'static,
+  IV: IntoView,
+  {
+    view! { cx,
+      <Suspense
+        fallback=|| ()
       >
-          <label>
-              "What do you need to do?"
-              <input type="text"
-                  node_ref=input_ref
-              />
-          </label>
-          <button type="submit">"Add Todo"</button>
-      </form>
-      // use our loading state
-      <p>{move || pending().then("Loading...")}</p>
+        <Show
+          // check whether user is verified
+          // by reading from the resource
+          when=move || todo!()
+          fallback=fallback
+        >
+          {children(cx)}
+        </Show>
+      </Suspense>
+    }
   }
 */
 
-// Now, there’s a chance this all seems a little over-complicated, or
-// maybe too restricted. I wanted to include actions here, alongside
-// resources, as the missing piece of the puzzle. In a real Leptos app,
-// you’ll actually most often use actions alongside server functions,
-// create_server_action,
-// https://docs.rs/leptos/latest/leptos/fn.create_server_action.html
-// and the <ActionForm/> component
-// https://docs.rs/leptos_router/latest/leptos_router/fn.ActionForm.html
-// to create really powerful progressively-enhanced forms.
-// So if this primitive seems useless to you... Don’t worry! Maybe it
-// will make sense later.
-// (Or check out our todo_app_sqlite example now.)
-// https://github.com/leptos-rs/leptos/blob/main/examples/todo_app_sqlite/src/todo.rs
+// This is pretty straightforward: when the user is logged in, we want
+// to show children. If the user is not logged in, we want to show
+// fallback. And while we’re waiting to find out, we just render (),
+// i.e., nothing.
+
+// In other words, we want to pass the children of <LoggedIn/> through
+// the <Suspense/> component to become the children of the <Show/>.
+// This is what I mean by “projection.”
+
+// This won’t compile.
+
+/*
+  error[E0507]: cannot move out of `fallback`, a captured variable in an `Fn` closure
+  error[E0507]: cannot move out of `children`, a captured variable in an `Fn` closure
+*/
+
+// The problem here is that both <Suspense/> and <Show/> need to be able
+// to construct their children multiple times. The first time you
+// construct <Suspense/>’s children, it would take ownership of fallback
+// and children to move them into the invocation of <Show/>, but then
+// they're not available for future <Suspense/> children construction.
+
+// The Details
+
+// Feel free to skip ahead to the solution.
+
+// If you want to really understand the issue here, it may help to look
+// at the expanded view macro. Here’s a cleaned-up version:
+
+/*
+  Suspense(
+      cx,
+      ::leptos::component_props_builder(&Suspense)
+          .fallback(|| ())
+          .children({
+              // fallback and children are moved into this closure
+              Box::new(move |cx| {
+                  {
+                      // fallback and children captured here
+                      leptos::Fragment::lazy(|| {
+                          vec![
+                              (Show(
+                                  cx,
+                                  ::leptos::component_props_builder(&Show)
+                                      .when(|| true)
+                                      // but fallback is moved into Show here
+                                      .fallback(fallback)
+                                      // and children is moved into Show here
+                                      .children(children)
+                                      .build(),
+                              )
+                              .into_view(cx)),
+                          ]
+                      })
+                  }
+              })
+          })
+          .build(),
+  )
+*/
+
+// All components own their props; so the <Show/> in this case can’t be
+// called because it only has captured references to fallback and
+// children.
+
+// Solution
+
+// However, both <Suspense/> and <Show/> take ChildrenFn, i.e., their
+// children should implement the Fn type so they can be called multiple
+// times with only an immutable reference. This means we don’t need to
+// own children or fallback; we just need to be able to pass 'static
+// references to them.
+
+// We can solve this problem by using the store_value primitive. This
+// essentially stores a value in the reactive system, handing ownership
+// off to the framework in exchange for a reference that is, like
+// signals, Copy and 'static, which we can access or modify through
+// certain methods.
+
+// In this case, it’s really simple:
+
+/*
+  pub fn LoggedIn<F, IV>(
+    cx: Scope,
+    fallback: F,
+    children: ChildrenFn
+  ) -> impl IntoView
+  where
+      F: Fn(Scope) -> IV + 'static,
+      IV: IntoView,
+  {
+      let fallback = store_value(cx, fallback);
+      let children = store_value(cx, children);
+      view! { cx,
+          <Suspense
+              fallback=|| ()
+          >
+              <Show
+                  when=|| todo!()
+                  fallback=move |cx| fallback.with_value(|fallback| fallback(cx))
+              >
+                  {children.with_value(|children| children(cx))}
+              </Show>
+          </Suspense>
+      }
+  }
+*/
+
+// At the top level, we store both fallback and children in the reactive
+// scope owned by LoggedIn. Now we can simply move those references down
+// through the other layers into the <Show/> component and call them
+// there.
 
 // --------------------------------------------------------------------
-// 6.4 Async - Actions - Final Example
+// 7.0 Projecting Children - Final Note
 // --------------------------------------------------------------------
 
-use gloo_timers::future::TimeoutFuture;
-use leptos::{html::Input, *};
-use uuid::Uuid;
+// Note that this works because <Show/> and <Suspense/> only need an
+// immutable reference to their children (which .with_value can give it),
+// not ownership.
 
-// Here we define an async function
-// This could be anything: a network request, database read, etc.
-// Think of it as a mutation: some imperative async action you run,
-// whereas a resource would be some async data you load
-async fn add_todo(text: &str) -> Uuid {
-    _ = text;
-    // fake a one-second delay
-    TimeoutFuture::new(1_000).await;
-    // pretend this is a post ID or something
-    Uuid::new_v4()
+// In other cases, you may need to project owned props through a function
+// that takes ChildrenFn and therefore needs to be called more than once.
+// In this case, you may find the clone: helper in the view macro helpful.
+
+// Consider this example - below
+
+// Even with name=name.clone(), this gives the error
+
+/*
+  cannot move out of `name`, a captured variable in an `Fn` closure
+*/
+
+// It’s captured through multiple levels of children that need to run
+// more than once, and there’s no obvious way to clone it into the
+// children.
+
+// In this case, the clone: syntax comes in handy. Calling clone:name
+// will clone name before moving it into <Inner/>’s children, which
+// solves our ownership issue.
+
+/*
+  view! { cx,
+    <Outer>
+      <Inner clone:name> // <-- Solution -->
+        <Inmost name=name.clone()/>
+      </Inner>
+    </Outer>
+  }
+*/
+
+// These issues can be a little tricky to understand or debug, because
+// of the opacity of the view macro. But in general, they can always
+// be solved.
+
+use leptos::*;
+
+#[component]
+pub fn App(cx: Scope) -> impl IntoView {
+    let name = "Alice".to_string();
+    view! { cx,
+        <Outer>
+            <p>"> Outer:"</p>
+            // <-- Solution -->
+            <Inner clone:name>
+              <p>"---> Inner:"</p>
+                <Inmost name=name.clone()/>
+            </Inner>
+        </Outer>
+    }
 }
 
 #[component]
-fn App(cx: Scope) -> impl IntoView {
-    // an action takes an async function with a single argument
-    // it can be a simple type, a struct, or ()
-    let add_todo = create_action(cx, |input: &String| {
-        // the input is a reference, but we need the Future to own it
-        // this is important: we need to clone and move into the Future
-        // so it has a 'static lifetime
-        let input = input.to_owned();
-        async move { add_todo(&input).await }
-    });
+pub fn Outer(cx: Scope, children: ChildrenFn) -> impl IntoView {
+    children(cx)
+}
 
-    // actions provide a bunch of synchronous, reactive variables
-    // that tell us different things about the state of the action
-    let submitted = add_todo.input();
-    let pending = add_todo.pending();
-    let todo_id = add_todo.value();
+#[component]
+pub fn Inner(cx: Scope, children: ChildrenFn) -> impl IntoView {
+    children(cx)
+}
 
-    let input_ref = create_node_ref::<Input>(cx);
-
+#[component]
+pub fn Inmost(cx: Scope, name: String) -> impl IntoView {
     view! { cx,
-        <form on:submit=move |ev| {
-            ev.prevent_default();
-            let input = input_ref.get().expect("input to exist");
-            add_todo.dispatch(input.value());
-        }>
-
-            <label>
-                "What do you need to do?"
-                <input type="text" node_ref=input_ref/>
-            </label>
-            <button type="submit">"Add Todo"</button>
-        </form>
-        <p style="height: 10px;">{move || pending().then(|| "Loading...")}</p>
-        <p>
-            "Submitted: " <code>{move || format!("{:#?}", submitted())}</code>
-        </p>
-        <p>"Pending: " <code>{move || format!("{:#?}", pending())}</code></p>
-        <p>"Todo ID: " <code>{move || format!("{:#?}", todo_id())}</code></p>
-    }
+    <p>"------> Inmost:"</p>
+    <p>"---------> "{name}</p> }
 }
 
 fn main() {
