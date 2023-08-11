@@ -1,223 +1,125 @@
-/* 9.2 Routing - Nested Routing */
+/* 9.3 Routing - Params and Queries */
 
-// We just defined the following set of routes:
+// Static paths are useful for distinguishing between different pages,
+// but almost every application wants to pass data through the URL at
+// some point.
 
-/*
-  <Routes>
-    <Route path="/" view=Home/>
-    <Route path="/users" view=Users/>
-    <Route path="/users/:id" view=UserProfile/>
-    <Route path="/`*any" view=NotFound/> <--- remove `
-  </Routes>
-*/
+// There are two ways you can do this:
 
-// There’s a certain amount of duplication here: /users and /users/:id.
-// This is fine for a small app, but you can probably already tell it
-// won’t scale well. Wouldn’t it be nice if we could nest these routes?
+// 1. named route params like id in /users/:id
+// 2. named route queries like q in /search?q=Foo
 
-// Well... you can!
+// Because of the way URLs are built, you can access the query from any
+// <Route/> view. You can access route params from the <Route/> that
+// defines them or any of its nested children.
 
-/*
-  <Routes>
-    <Route path="/" view=Home/>
-    <Route path="/users" view=Users>
-      <Route path=":id" view=UserProfile/>
-    </Route>
-    <Route path="/`*any" view=NotFound/> <--- remove `
-  </Routes>
-*/
+// Accessing params and queries is pretty simple with a couple of hooks:
 
-// But wait. We’ve just subtly changed what our application does.
+// use_query
+// https://docs.rs/leptos_router/latest/leptos_router/fn.use_query.html
+// use_query_map
+// https://docs.rs/leptos_router/latest/leptos_router/fn.use_query_map.html
+// use_params
+// https://docs.rs/leptos_router/latest/leptos_router/fn.use_params.html
+// use_params_map
+// https://docs.rs/leptos_router/latest/leptos_router/fn.use_query_map.html
 
-// The next section is one of the most important in this entire routing
-// section of the guide. Read it carefully, and feel free to ask
-// questions if there’s anything you don’t understand.
+// Each of these comes with a typed option (use_query and use_params) and
+// an untyped option (use_query_map and use_params_map).
 
-// Nested Routes as Layout
+// The untyped versions hold a simple key-value map. To use the typed
+// versions, derive the Params trait on a struct.
 
-// Nested routes are a form of layout, not a method of route definition.
-
-// Let me put that another way: The goal of defining nested routes is
-// not primarily to avoid repeating yourself when typing out the paths
-// in your route definitions. It is actually to tell the router to
-// display multiple <Route/>s on the page at the same time, side by side.
-
-// Let’s look back at our practical example.
+// Params is a very lightweight trait to convert a flat key-value map of
+// strings into a struct by applying `FromStr` to each field. Because of
+// the flat structure of route params and URL queries, it’s significantly
+// less flexible than something like serde; it also adds much less weight
+// to your binary.
 
 /*
-  <Routes>
-    <Route path="/users" view=Users/>
-    <Route path="/users/:id" view=UserProfile/>
-  </Routes>
-*/
+  use leptos::*;
+  use leptos_router::*;
 
-// This means:
+  #[derive(Params)]
+  struct ContactParams {
+      id: usize
+  }
 
-// If I go to /users, I get the <Users/> component.
-// If I go to /users/3, I get the <UserProfile/> component (with the
-// parameter id set to 3; more on that later)
-
-// Let’s say I use nested routes instead:
-
-/*
-  <Routes>
-    <Route path="/users" view=Users>
-      <Route path=":id" view=UserProfile/>
-    </Route>
-  </Routes>
-*/
-
-// This means:
-
-// If I go to /users/3, the path matches two <Route/>s: <Users/> and
-// <UserProfile/>.
-// If I go to /users, the path is not matched.
-
-// I actually need to add a fallback route
-
-/*
-  <Routes>
-    <Route path="/users" view=Users>
-      <Route path=":id" view=UserProfile/>
-      <Route path="" view=NoUser/>
-    </Route>
-  </Routes>
-*/
-
-// Now:
-
-// If I go to /users/3, the path matches <Users/> and <UserProfile/>.
-// If I go to /users, the path matches <Users/> and <NoUser/>.
-
-// When I use nested routes, in other words, each path can match
-// multiple routes: each URL can render the views provided by multiple
-// <Route/> components, at the same time, on the same page.
-
-// This may be counter-intuitive, but it’s very powerful, for reasons
-// you’ll hopefully see in a few minutes.
-
-// Why Nested Routing?
-
-// Why bother with this?
-
-// Most web applications contain levels of navigation that correspond
-// to different parts of the layout. For example, in an email app you
-// might have a URL like /contacts/greg, which shows a list of contacts
-// on the left of the screen, and contact details for Greg on the right
-// of the screen. The contact list and the contact details should always
-// appear on the screen at the same time. If there’s no contact selected,
-// maybe you want to show a little instructional text.
-
-// You can easily define this with nested routes
-
-/*
-  <Routes>
-    <Route path="/contacts" view=ContactList>
-      <Route path=":id" view=ContactInfo/>
-      <Route path="" view=|cx| view! { cx,
-        <p>"Select a contact to view more info."</p>
-      }/>
-    </Route>
-  </Routes>
-*/
-
-// You can go even deeper. Say you want to have tabs for each contact’s
-// address, email/phone, and your conversations with them. You can add
-// another set of nested routes inside :id:
-
-/*
-  <Routes>
-    <Route path="/contacts" view=ContactList>
-      <Route path=":id" view=ContactInfo>
-        <Route path="" view=EmailAndPhone/>
-        <Route path="address" view=Address/>
-        <Route path="messages" view=Messages/>
-      </Route>
-      <Route path="" view=|cx| view! { cx,
-        <p>"Select a contact to view more info."</p>
-      }/>
-    </Route>
-  </Routes>
-*/
-
-// The main page of the Remix website,
-// https://remix.run/
-// a React framework from the creators of React Router, has a great
-// visual example if you scroll down, with three levels of nested
-// routing: Sales > Invoices > an invoice.
-
-// <Outlet/>
-
-// Parent routes do not automatically render their nested routes. After
-// all, they are just components; they don’t know exactly where they
-// should render their children, and “just stick it at the end of the
-// parent component” is not a great answer.
-
-// Instead, you tell a parent component where to render any nested
-// components with an <Outlet/> component. The <Outlet/> simply renders
-// one of two things:
-
-// if there is no nested route that has been matched, it shows nothing
-// if there is a nested route that has been matched, it shows its view
-
-// That’s all! But it’s important to know and to remember, because it’s
-// a common source of “Why isn’t this working?” frustration. If you don’t
-// provide an <Outlet/>, the nested route won’t be displayed.
-
-/*
-  #[component]
-  pub fn ContactList(cx: Scope) -> impl IntoView {
-    let contacts = todo!();
-
-    view! { cx,
-      <div style="display: flex">
-        // the contact list
-        <For each=contacts
-          key=|contact| contact.id
-          view=|cx, contact| todo!()
-        >
-        // the nested child, if any
-        // don’t forget this!
-        <Outlet/> <---
-      </div>
-    }
+  #[derive(Params)]
+  struct ContactSearch {
+      q: String
   }
 */
 
-// Nested Routing and Performance
+// Note: The Params derive macro is located at leptos::Params, and the
+// Params trait is at leptos_router::Params. If you avoid using glob
+// imports like use leptos::*;, make sure you’re importing the right one
+// for the derive macro.
 
-// All of this is nice, conceptually, but again—what’s the big deal?
+// If you are not using the nightly feature, you will get the error:
+/*
+  no function or associated item named `into_param` found for struct
+  `std::string::String` in the current scope
+*/
+// At the moment, supporting both T: FromStr and Option<T> for typed
+// params requires a nightly feature. You can fix this by simply changing
+// the struct to use q: Option<String> instead of q: String.
 
-// Performance.
+// Now we can use them in a component. Imagine a URL that has both params
+// and a query, like /contacts/:id?q=Search.
 
-// In a fine-grained reactive library like Leptos, it’s always important
-// to do the least amount of rendering work you can. Because we’re
-// working with real DOM nodes and not diffing a virtual DOM, we want to
-// “rerender” components as infrequently as possible. Nested routing
-// makes this extremely easy.
+// The typed versions return Memo<Result<T, _>>. It’s a Memo so it reacts
+// to changes in the URL. It’s a Result because the params or query need
+// to be parsed from the URL, and may or may not be valid.
 
-// Imagine my contact list example. If I navigate from Greg to Alice to
-// Bob and back to Greg, the contact information needs to change on each
-// navigation. But the <ContactList/> should never be rerendered. Not
-// only does this save on rendering performance, it also maintains state
-// in the UI. For example, if I have a search bar at the top of
-// <ContactList/>, navigating from Greg to Alice to Bob won’t clear the
-// search.
+/*
+  let params = use_params::<ContactParams>(cx);
+  let query = use_query::<ContactSearch>(cx);
 
-// In fact, in this case, we don’t even need to rerender the <Contact/>
-// component when moving between contacts. The router will just
-// reactively update the :id parameter as we navigate, allowing us to
-// make fine-grained updates. As we navigate between contacts, we’ll
-// update single text nodes to change the contact’s name, address, and
-// so on, without doing any additional rerendering.
+  // id: || -> usize
+  let id = move || {
+      params.with(|params| {
+          params
+              .map(|params| params.id)
+              .unwrap_or_default()
+      })
+  };
+*/
 
-// This sandbox includes a couple features (like nested routing)
-// discussed in this section and the previous one, and a couple we’ll
-// cover in the rest of this chapter.
+// The untyped versions return Memo<ParamsMap>. Again, it’s memo to react
+// to changes in the URL. ParamsMap behaves a lot like any other map
+// type, with a .get() method that returns Option<&String>.
 
-// The router is such an integrated system that it makes sense to
-// provide a single example, so don’t be surprised if there’s anything
-// you don’t understand.
+/*
+  let params = use_params_map(cx);
+  let query = use_query_map(cx);
+
+  // id: || -> Option<String>
+  let id = move || {
+      params.with(|params| params.get("id").cloned())
+  };
+*/
+
+// This can get a little messy: deriving a signal that wraps an Option<_>
+// or Result<_> can involve a couple steps. But it’s worth doing this for
+// two reasons:
+
+// 1. It’s correct, i.e., it forces you to consider the cases, “What if
+//    the user doesn’t pass a value for this query field? What if they
+//    pass an invalid value?”
+// 2. It’s performant. Specifically, when you navigate between different
+//    paths that match the same <Route/> with only params or the query
+//    changing, you can get fine-grained updates to different parts of
+//    your app without rerendering. For example, navigating between
+//    different contacts in our contact-list example does a targeted
+//    update to the name field (and eventually contact info) without
+//    needing to replace or rerender the wrapping <Contact/>. This is
+//    what fine-grained reactivity is for.
+
+// This is the same example from the previous section. The router is
+// such an integrated system that it makes sense to provide a single
+// example highlighting multiple features, even if we haven’t explained
+// them all yet.
 
 // -----------------------------------------------------------------
 // Router Example
@@ -257,12 +159,14 @@ fn App(cx: Scope) -> impl IntoView {
                                     view! { cx, <div class="tab">"(Contact Info)"</div> }
                                 }
                             />
+
                             <Route
                                 path="conversations"
                                 view=|cx| {
                                     view! { cx, <div class="tab">"(Conversations)"</div> }
                                 }
                             />
+
                         </Route>
                         // if no id specified, fall back
                         <Route
@@ -275,6 +179,7 @@ fn App(cx: Scope) -> impl IntoView {
                                 }
                             }
                         />
+
                     </Route>
                 </Routes>
             </main>
