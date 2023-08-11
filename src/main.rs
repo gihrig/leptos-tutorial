@@ -1,80 +1,115 @@
-/* 9.4 Routing - The <A/> Component */
+/* 9.5 Routing - The <Form/> Component */
 
-// Client-side navigation works perfectly fine with ordinary HTML <a>
-// elements. The router adds a listener that handles every click on an
-// <a> element and tries to handle it on the client side, i.e., without
-// doing another round trip to the server to request HTML. This is what
-// enables the snappy “single-page app” navigations you’re probably
-// familiar with from most modern web apps.
+// Links and forms sometimes seem completely unrelated. But, in fact,
+// they work in very similar ways.
 
-// The router will bail out of handling an <a> click under a number of
-// situations
+// In plain HTML, there are three ways to navigate to another page:
 
-// 1. the click event has had prevent_default() called on it
-// 2. the Meta, Alt, Ctrl, or Shift keys were held during click
-// 3. the <a> has a target or download attribute, or rel="external"
-// 4. the link has a different origin from the current location
+// 1. An <a> element that links to another page: Navigates to the URL
+//    in its href attribute with the GET HTTP method.
+// 2. A <form method="GET">: Navigates to the URL in its action attribute
+//    with the GET HTTP method and the form data from its inputs encoded
+//    in the URL query string.
+// 3. A <form method="POST">: Navigates to the URL in its action
+//    attribute with the POST HTTP method and the form data from its
+//    inputs encoded in the body of the request.
 
-// In other words, the router will only try to do a client-side navigation
-// when it’s pretty sure it can handle it, and it will upgrade every <a>
-// element to get this special behavior.
+// Since we have a client-side router, we can do client-side link
+// navigations without reloading the page, i.e., without a full
+// round-trip to the server and back. It makes sense that we can do
+// client-side form navigations in the same way.
 
-// This also means that if you need to opt out of client-side routing,
-// you can do so easily. For example, if you have a link to another page
-// on the same domain, but which isn’t part of your Leptos app, you can
-// just use <a rel="external"> to tell the router it isn’t something it
-// can handle.
+// The router provides a <Form> component,
+// https://docs.rs/leptos_router/latest/leptos_router/fn.Form.html
+// which works like the HTML <form> element, but uses client-side
+// navigations instead of full page reloads. <Form/> works with both
+// GET and POST requests.
+// With method="GET", it will navigate to the URL encoded in the form
+// data.
+// With method="POST" it will make a POST request and handle the server’s
+// response.
 
-// The router also provides an <A> component,
-// https://docs.rs/leptos_router/latest/leptos_router/fn.A.html
-// which does two additional things:
+// <Form/> provides the basis for some components like <ActionForm/>
+// and <MultiActionForm/> that we’ll see in later chapters. But it also
+// enables some powerful patterns of its own.
 
-// 1. Correctly resolves relative nested routes. Relative routing with
-//    ordinary <a> tags can be tricky. For example, if you have a route
-//    like /post/:id, <A href="1"> will generate the correct relative
-//    route, but <a href="1"> likely will not (depending on where it
-//    appears in your view.) <A/> resolves routes relative to the path
-//    of the nested route within which it appears.
-// 2. Sets the aria-current attribute to page if this link is the active
-//    link (i.e., it’s a link to the page you’re on). This is helpful for
-//    accessibility and for styling. For example, if you want to set the
-//    link to a different color if it’s a link to the page you’re
-//    currently on, you can match this attribute with a CSS selector.
+// For example, imagine that you want to create a search field that
+// updates search results in real time as the user searches, without a
+// page reload, but that also stores the search in the URL so a user can
+// copy and paste it to share results with someone else.
 
-// Navigating Programmatically
-
-// Your most-used methods of navigating between pages should be with <a>
-// and <form> elements or with the enhanced <A/> and <Form/> components.
-// Using links and forms to navigate is the best solution for
-// accessibility and graceful degradation.
-
-// On occasion, though, you’ll want to navigate programmatically, i.e.,
-// call a function that can navigate to a new page. In that case, you
-// should use the `use_navigate` function.
-// https://docs.rs/leptos_router/latest/leptos_router/fn.use_navigate.html
+// It turns out that the patterns we’ve learned so far make this easy to
+// implement.
 
 /*
-  let navigate = leptos_router::use_navigate(cx);
-  navigate("/somewhere", Default::default());
+  async fn fetch_results() {
+      // some async function to fetch our search results
+  }
+
+  #[component]
+  pub fn FormExample(cx: Scope) -> impl IntoView {
+      // reactive access to URL query strings
+      let query = use_query_map(cx);
+      // search stored as ?q=
+      let search = move || query().get("q").cloned().unwrap_or_default();
+      // a resource driven by the search string
+      let search_results = create_resource(cx, search, fetch_results);
+
+      view! { cx,
+          <Form method="GET" action="">
+              <input type="search" name="search" value=search/>
+              <input type="submit"/>
+          </Form>
+          <Transition fallback=move || ()>
+              /* render search results */
+          </Transition>
+      }
+  }
 */
 
-// You should almost never do something like
+// Whenever you click Submit, the <Form/> will “navigate” to ?q={search}.
+// But because this navigation is done on the client side, there’s no
+// page flicker or reload. The URL query string changes, which triggers
+// search to update. Because search is the source signal for the
+// `search_results` resource, this triggers search_results to reload its
+// resource. The <Transition/> continues displaying the current search
+// results until the new ones have loaded. When they are complete, it
+// switches to displaying the new result.
+
+// This is a great pattern. The data flow is extremely clear: all data
+// flows from the URL to the resource into the UI. The current state of
+// the application is stored in the URL, which means you can refresh the
+// page or text the link to a friend and it will show exactly what you’re
+// expecting. And once we introduce server rendering, this pattern will
+// prove to be really fault-tolerant, too: because it uses a <form>
+// element and URLs under the hood, it actually works really well without
+// even loading your WASM on the client.
+
+// We can actually take it a step further and do something kind of clever:
+
 /*
-  <button on:click=move |_| navigate(/* ... */)>.
+  view! { cx,
+      <Form method="GET" action="">
+          <input type="search" name="search" value=search
+              oninput="this.form.requestSubmit()"
+          />
+      </Form>
+  }
 */
-// Any on:click that navigates should be an <a>, for reasons of
-// accessibility.
 
-// The second argument here is a set of NavigateOptions,
-// https://docs.rs/leptos_router/latest/leptos_router/struct.NavigateOptions.html
-// which includes options to resolve the navigation relative to the
-// current route as the <A/> component does, replace it in the navigation
-// stack, include some navigation state, and maintain the current scroll
-// state on navigation.
+// You’ll notice that this version drops the Submit button. Instead, we
+// add an oninput attribute to the input. Note that this is not `on:input`,
+// which would listen for the input event and run some Rust code. Without
+// the colon, `oninput` is the plain HTML attribute. So the string is
+// actually a JavaScript string. `this.form` gives us the form the input
+// is attached to. `requestSubmit()` fires the `submit` event on the
+// <form>, which is caught by <Form/> just as if we had clicked a Submit
+// button. Now the form will “navigate” on every keystroke or input to
+// keep the URL (and therefore the search) perfectly in sync with the
+// user’s input as they type.
 
-// Once again, this is the same example. Check out the relative <A/>
-// components, and take a look at the CSS in index.html to see the
-// ARIA-based styling.
+// See Leptos Router example for more details.
+// https://github.com/leptos-rs/leptos/tree/main/examples/router
 
 // -----------------------------------------------------------------
 // Router Example
