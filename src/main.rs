@@ -1,4 +1,4 @@
-/* 10.1 Styling - TailwindCSS */
+/* 10.2 Styling - Stylers */
 
 // Anyone creating a website or application soon runs into the question
 // of styling. For a small app, a single CSS file is probably plenty to
@@ -19,68 +19,80 @@
 // than plain CSS.
 
 // --------------------------------------------------------------------
-// TailwindCSS: Utility-first CSS
+// Stylers - Compile-time CSS Extraction
 // --------------------------------------------------------------------
 
-// TailwindCSS is a popular utility-first CSS library. It allows you to
-// style your application by using inline utility classes, with a custom
-// CLI tool that scans your files for Tailwind class names and bundles
-// the necessary CSS.
+// Stylers
+// https://github.com/abishekatp/stylers
+// is a compile-time scoped CSS library that lets you declare scoped
+// CSS in the body of your component. Stylers will extract this CSS
+// at compile time into CSS files that you can then import into your
+// app, which means that it doesn’t add anything to the WASM binary
+// size of your application.
 
 // This allows you to write components like this:
 
 /*
-  #[component]
-  fn Home(cx: Scope) -> impl IntoView {
-      let (count, set_count) = create_signal(cx, 0);
+use stylers::style;
 
-      view! { cx,
-          <main class="my-0 mx-auto max-w-3xl text-center">
-              <h2 class="p-6 text-4xl">"Welcome to Leptos with Tailwind"</h2>
-              <p class="px-10 pb-10 text-left">"Tailwind will scan your Rust files for Tailwind class names and compile them into a CSS file."</p>
-              <button
-                  class="bg-sky-600 hover:bg-sky-700 px-5 py-3 text-white rounded-lg"
-                  on:click=move |_| set_count.update(|count| *count += 1)
-              >
-                  {move || if count() == 0 {
-                      "Click me!".to_string()
-                  } else {
-                      count().to_string()
-                  }}
-              </button>
-          </main>
-      }
-  }
+#[component]
+pub fn App(cx: Scope) -> impl IntoView {
+    let styler_class = style! { "App",
+        two{
+            color: blue;
+        }
+        div.one{
+            color: red;
+            content: raw_str(r#"\hello"#);
+            font: "1.3em/1.2" Arial, Helvetica, sans-serif;
+        }
+        div {
+            border: 1px solid black;
+            margin: 25px 50px 75px 100px;
+            background-color: lightblue;
+        }
+        h2 {
+            color: purple;
+        }
+        @media only screen and (max-width: 1000px) {
+            h3 {
+                background-color: lightblue;
+                color: blue
+            }
+        }
+    };
+
+    view! { cx, class = styler_class,
+        <div class="one">
+            <h1 id="two">"Hello"</h1>
+            <h2>"World"</h2>
+            <h2>"and"</h2>
+            <h3>"friends!"</h3>
+        </div>
+    }
+}
 */
 
-// It can be a little complicated to set up the Tailwind integration at
-// first, but you can check out our two examples of how to use Tailwind
-// with a client-side-rendered trunk application
-// https://github.com/leptos-rs/leptos/tree/main/examples/tailwind_csr_trunk
-
-// or with a server-rendered cargo-leptos application.
-// https://github.com/leptos-rs/leptos/tree/main/examples/tailwind
-
-// cargo-leptos also has some built-in Tailwind support that you can
-// use as an alternative to Tailwind’s CLI.
-// https://github.com/leptos-rs/cargo-leptos#site-parameters
-
-// ----------------------------------------------------------------------
-// TailwindCSS Example - from leptos examples tailwind_csr_trunk
-// ----------------------------------------------------------------------
-
-mod app;
-
-use app::*;
+// ----------------------------------------------------------------
+// Stylers Example from
+// https://github.com/abishekatp/stylers/tree/main/examples/style
+// Seems broken:
+// Compiling stylers v0.3.1
+// error[E0615]: attempted to take value of method `column` on type `proc_macro::Span`
+//   --> /Users/glen/.cargo/registry/src/index.crates.io-6f17d22bba15001f/stylers-0.3.1/src/style/css_style_rule.rs:74:47
+//    |
+// 74 | ...                   pre_col = end.column;
+//    |                                     ^^^^^^ method, not a field
+//    |
+// help: use parentheses to call the method
+//    |
+// 74 |                                 pre_col = end.column();
+// Plus 5 more
+// ----------------------------------------------------------------
 use leptos::*;
+use style_macro::*;
 
 pub fn main() {
-    _ = console_log::init_with_level(log::Level::Debug);
-    console_error_panic_hook::set_once();
-
-    log!("csr mode - mounting to body");
-
-    mount_to_body(|cx| {
-        view! { cx, <App/> }
-    });
+    println!["Hello, stylers!"];
+    mount_to_body(|cx| view! { cx,  <Abi/> });
 }
