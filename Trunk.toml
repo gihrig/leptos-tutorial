@@ -3,3 +3,8 @@
 address = "127.0.0.1"
 # The port to serve on.
 port = 8000
+
+[[hooks]]
+stage = "pre_build"
+command = "sh"
+command_arguments = ["-c", "npx tailwindcss -i input.css -o style/output.css"]

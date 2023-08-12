@@ -5,9 +5,12 @@ edition = "2021"
 
 [dependencies]
 leptos = { version = "0.4.8", features = ["csr", "nightly"] }
-leptos_router = { version = "0.4.8", features = ["csr"] }
-console_log = "1.0.0"
+leptos_meta = { version = "0.4.8", features = ["csr", "nightly"] }
+leptos_router = { version = "0.4.8", features = ["csr", "nightly"] }
 log = "0.4"
-console_error_panic_hook = "0.1.7"
-gloo-timers = { version = "0.2", features = ["futures"] }
-uuid = { version = "1.4.1", features = ["v4", "js"] }
+gloo-net = { version = "0.4.0", features = ["http"] }
+
+# dependecies for client (enable when csr or hydrate set)
+wasm-bindgen = { version = "0.2" }
+console_log = { version = "1"}
+console_error_panic_hook = { version = "0.1"}
