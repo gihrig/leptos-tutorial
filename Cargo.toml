@@ -4,8 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-leptos = { version = "0.4.8", features = ["csr"] }
-stylers = "0.3.1"
+leptos = { version = "0.4.8", features = ["csr", "nightly"] }
+styled = "0.1.36"
+stylist = "0.12.1"
 
 # dependecies for client (enable when csr or hydrate set)
 wasm-bindgen = { version = "0.2" }

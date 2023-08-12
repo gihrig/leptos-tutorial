@@ -3,8 +3,3 @@
 address = "127.0.0.1"
 # The port to serve on.
 port = 8000
-
-[[hooks]]
-stage = "post_build"
-command = "sh"
-command_arguments = ["-c", "cp ./target/stylers/main.css $TRUNK_STAGING_DIR/"]
