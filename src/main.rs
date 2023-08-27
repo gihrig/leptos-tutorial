@@ -1,4 +1,4 @@
-/* 10.3 Styling - Styled */
+/* 10.4 Styling - Styled - Longer */
 
 // Anyone creating a website or application soon runs into the question
 // of styling. For a small app, a single CSS file is probably plenty to
@@ -19,99 +19,34 @@
 // than plain CSS.
 
 // --------------------------------------------------------------------
-// Styled: Runtime CSS Scoping
-// --------------------------------------------------------------------
-
-// Styled
-// https://github.com/eboody/styled
-// is a runtime scoped CSS library that integrates well with Leptos. It lets you
-// declare scoped CSS in the body of your component function, and then applies those
-// styles at runtime.
-
-/*
-use styled::style;
-
-#[component]
-pub fn MyComponent(cx: Scope) -> impl IntoView {
-    let styles = style!(
-      div {
-        background-color: red;
-        color: white;
-      }
-    );
-
-    styled::view! { cx, styles,
-        <div>"This text should be red with white text."</div>
-    }
-}
-*/
-
+// Styled: Runtime CSS Scoping - Longer example
+// https://github.com/eboody/styled#longer-example
 // ----------------------------------------------------------------
-// Styled Example from
-// https://github.com/eboody/styled#usage
-// Seems broken:
-// Compiling leptos-tutorial v0.1.0 (/Users/glen/Documents/Development/Study/Rust/Leptos/leptos-tutorial)
-// error[E0277]: the trait bound `&fn(leptos_reactive::scope::Scope, StyleProps) -> impl leptos_dom::IntoView {Style}: ComponentConstructor<_>` is not satisfied
-//    --> src/main.rs:65:5
-//     |
-// 65  | /     styled::view! {
-// 66  | |         cx,
-// 67  | |         styles,
-// 68  | |         <div>"This text should be red with white text."</div>
-// 69  | |     }
-//     | |_____^ the trait `ComponentConstructor<_>` is not implemented for `&fn(leptos_reactive::scope::Scope, StyleProps) -> impl leptos_dom::IntoView {Style}`
-//     |
-// note: required by a bound in `component_view`
-//    --> /Users/glen/.cargo/registry/src/index.crates.io-6f17d22bba15001f/leptos-0.4.8/src/lib.rs:290:13
-//     |
-// 289 | pub fn component_view<P>(
-//     |        -------------- required by a bound in this function
-// 290 |     f: impl ComponentConstructor<P>,
-//     |             ^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `component_view`
-//     = note: this error originates in the macro `view` which comes from the expansion of the macro `styled::view` (in Nightly builds, run with -Z macro-backtrace for more info)
-// ----------------------------------------------------------------
+
 use leptos::*;
-use styled::style;
 
-#[component]
-pub fn MyComponent(cx: Scope) -> impl IntoView {
-    let styles = style!(
-      div {
-        background-color: red;
-        color: white;
-      }
-    );
-
-    styled::view! {
-        cx,
-        styles,
-        <div>"This text should be red with white text."</div>
-    }
+pub mod components {
+    pub mod button;
+    pub mod theme;
 }
 
-#[component]
-pub fn AnotherComponent(cx: Scope) -> impl IntoView {
-    // note were using a plain div selector and it wont clash with MyComponent's div style!
-    let styles = style!(
-      div {
-        background-color: blue;
-        color: gray;
-      }
-    );
+use crate::components::button::{Button, Variant};
 
-    styled::view! {
-        cx,
-        styles,
-        <div>"This text should be blue with gray text."</div>
+#[component]
+pub fn HomePage(cx: Scope) -> impl IntoView {
+    view! { cx,
+      // TODO: css generated for first button only
+      // Variant not the issue, only the first
+      // button in code is styled
+        <Button variant=Variant::PRIMARY/>
+        <Button variant=Variant::SECONDARY/>
+        <Button variant=Variant::ALERT/>
     }
 }
 
 pub fn main() {
-    println!["Hello, stylers!"];
+    println!["Hello, styles!"];
     mount_to_body(|cx| {
-        view! { cx,
-          <MyComponent/>
-          <AnotherComponent/>
-        }
+        view! { cx, <HomePage/> }
     });
 }
