@@ -1,48 +1,62 @@
-/* 12.0 Server Side Rendering */
+/* 12.1 Server Side Rendering - Introducing cargo-leptos */
 
-// So far, everything we’ve written has been rendered almost entirely
-// in the browser. When we create an app using Trunk, it’s served
-// using a local development server. If you build it for production
-// and deploy it, it’s served by whatever server or CDN you’re using.
-// In either case, what’s served is an HTML page with
+// So far, we’ve just been running code in the browser and using
+// Trunk to coordinate the build process and run a local development
+// process. If we’re going to add server-side rendering, we’ll need
+// to run our application code on the server as well. This means
+// we’ll need to build two separate binaries, one compiled to native
+// code and running the server, the other compiled to WebAssembly
+// (WASM) and running in the user’s browser. Additionally, the
+// server needs to know how to serve this WASM version (and the
+// JavaScript required to initialize it) to the browser.
 
-// 1. the URL of your Leptos app, which has been compiled to
-//    WebAssembly (WASM)
-// 2. the URL of the JavaScript used to initialized this WASM blob
-// 3. an empty <body> element
+// This is not an insurmountable task but it adds some complication.
+// For convenience and an easier developer experience, we built the
+// cargo-leptos build tool.
+// https://github.com/leptos-rs/cargo-leptos
+// cargo-leptos basically exists to coordinate the build process for
+// your app, handling recompiling the server and client halves when
+// you make changes, and adding some built-in support for things like
+// Tailwind, SASS, and testing.
 
-// When the JS and WASM have loaded, Leptos will render your app into
-// the <body>. This means that nothing appears on the screen until
-// JS/WASM have loaded and run. This has some drawbacks:
+// Getting started is pretty easy. Just run
 
-// 1. It increases load time, as your user’s screen is blank until
-//    additional resources have been downloaded.
-// 2. It’s bad for SEO, as load times are longer and the HTML you
-//    serve has no meaningful content.
-// 3. It’s broken for users for whom JS/WASM don’t load for some
-//    reason (e.g., they’re on a train and just went into a tunnel
-//    before WASM finished loading; they’re using an older device
-//    that doesn’t support WASM; they have JavaScript or WASM turned
-//    off for some reason; etc.)
+/*
+  cargo install cargo-leptos
+*/
 
-// These downsides apply across the web ecosystem, but especially to
-// WASM apps.
+// And then to create a new project, you can run either
 
-// So what do you do if you want to return more than just an empty
-// <body> tag? Use “server-side rendering.”
+/*
+  # for an Actix template
+  cargo leptos new --git leptos-rs/start
+*/
 
-// Whole books could be (and probably have been) written about this
-// topic, but at its core, it’s really simple: rather than returning
-// an empty <body> tag, return an initial HTML page that reflects the
-// actual starting state of your app or site, so that while JS/WASM
-// are loading, and until they load, the user can access the plain
-// HTML version.
+// or
 
-// The rest of this section will cover this topic in some detail!
+/*
+  # for an Axum template
+  cargo leptos new --git leptos-rs/start-axum
+*/
+
+// Now cd into the directory you’ve created and run
+
+/*
+  cargo leptos watch
+*/
+
+// Once your app has compiled you can open up your browser to
+// http://localhost:3000 to see it.
+
+// cargo-leptos has lots of additional features and built in tools.
+// You can learn more in its README.
+
+// But what exactly is happening when you open our browser to
+// localhost:3000? Well, read on to find out.
 
 use leptos::*;
 pub fn main() {
     mount_to_body(|cx| {
-        view! { cx, <h1>"Server Side Rendering"</h1> }
+        view! { cx, <h1>"Server Side Rendering - Introducing cargo-leptos"</h1> }
     });
 }
