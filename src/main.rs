@@ -1,36 +1,41 @@
-/* 12.3.5 Server Side Rendering - Partially-blocked Streaming */
+/* 12.3.6 Server Side Rendering - Using SSR Modes */
 
-// ---------------------------
-// Partially-blocked Streaming
-// ---------------------------
+// ---------------
+// Using SSR Modes
+// ---------------
 
-// Partially-blocked streaming: “Partially-blocked” streaming is useful
-// when you have multiple separate <Suspense/> components on the page.
-// If one of them reads from one or more “blocking resources” (see below),
-// the fallback will not be sent; rather, the server will wait until that
-// <Suspense/> has resolved and then replace the fallback with the
-// resolved fragment on the server, which means that it is included in
-// the initial HTML response and appears even if JavaScript is disabled
-// or not supported. Other <Suspense/> stream in out of order as usual.
+// Because it offers the best blend of performance characteristics,
+// Leptos defaults to out-of-order streaming. But it’s really simple
+// to opt into these different modes. You do it by adding an ssr
+// property onto one or more of your <Route/> components, like in the
+// ssr_modes example.
+// https://github.com/leptos-rs/leptos/blob/main/examples/ssr_modes/src/app.rs
 
-// This is useful when you have multiple <Suspense/> on the page, and one
-// is more important than the other: think of a blog post and comments,
-// or product information and reviews. It is not useful if there’s only
-// one <Suspense/>, or if every <Suspense/> reads from blocking resources.
-// In those cases it is a slower form of async rendering.
+/*
+  <Routes>
+    // We’ll load the home page with out-of-order streaming and <Suspense/>
+    <Route path="" view=HomePage/>
 
-// Pros:
-//    Works if JavaScript is disabled or not supported on the user’s
-//    device.
-// Cons:
-//    Slower initial response time than out-of-order.
-//    Marginally slower overall response due to additional work on the
-//      server.
-//    No fallback state shown.
+    // We'll load the posts with async rendering, so they can set
+    // the title and metadata *after* loading the data
+    <Route
+      path="/post/:id"
+      view=Post
+      ssr=SsrMode::Async
+    />
+  </Routes>
+*/
+
+// For a path that includes multiple nested routes, the most restrictive
+// mode will be used: i.e., if even a single nested route asks for async
+// rendering, the whole initial request will be rendered async. async is
+// the most restricted requirement, followed by in-order, and then
+// out-of-order. (This probably makes sense if you think about it for a
+// few minutes.)
 
 use leptos::*;
 pub fn main() {
     mount_to_body(|cx| {
-        view! { cx, <h1>"Server Side Rendering - Partially-blocked Streaming"</h1> }
+        view! { cx, <h1>"Server Side Rendering - Using SSR Modes"</h1> }
     });
 }
