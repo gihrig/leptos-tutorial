@@ -1,41 +1,68 @@
-/* 12.3.6 Server Side Rendering - Using SSR Modes */
+/* 12.3.7 Server Side Rendering - Blocking Resources */
 
-// ---------------
-// Using SSR Modes
-// ---------------
+// ------------------
+// Blocking Resources
+// ------------------
 
-// Because it offers the best blend of performance characteristics,
-// Leptos defaults to out-of-order streaming. But it’s really simple
-// to opt into these different modes. You do it by adding an ssr
-// property onto one or more of your <Route/> components, like in the
-// ssr_modes example.
-// https://github.com/leptos-rs/leptos/blob/main/examples/ssr_modes/src/app.rs
+// Any Leptos versions later than 0.2.5 (i.e., git main and 0.3.x or
+// later) introduce a new resource primitive with
+// `create_blocking_resource`. A blocking resource still loads
+// asynchronously like any other async/.await in Rust; it doesn’t
+// block a server thread or anything. Instead, reading from a blocking
+// resource under a <Suspense/> blocks the HTML stream from returning
+// anything, including its initial synchronous shell, until that
+// <Suspense/> has resolved.
+
+// Now from a performance perspective, this is not ideal. None of the
+// synchronous shell for your page will load until that resource is
+// ready. However, rendering nothing means that you can do things like
+// set the <title> or <meta> tags in your <head> in actual HTML. This
+// sounds a lot like async rendering, but there’s one big difference:
+// if you have multiple <Suspense/> sections, you can block on one of
+// them but still render a placeholder and then stream in the other.
+
+// For example, think about a blog post. For SEO and for social sharing,
+// I definitely want my blog post’s title and metadata in the initial
+// HTML <head>. But I really don’t care whether comments have loaded
+// yet or not; I’d like to load those as lazily as possible.
+
+// With blocking resources, I can do something like this:
 
 /*
-  <Routes>
-    // We’ll load the home page with out-of-order streaming and <Suspense/>
-    <Route path="" view=HomePage/>
-
-    // We'll load the posts with async rendering, so they can set
-    // the title and metadata *after* loading the data
-    <Route
-      path="/post/:id"
-      view=Post
-      ssr=SsrMode::Async
-    />
-  </Routes>
+  #[component]
+  pub fn BlogPost(cx: Scope) -> impl IntoView {
+    let post_data = create_blocking_resource(cx /* load blog post */);
+    let comment_data = create_resource(cx /* load blog post */);
+    view! { cx,
+      <Suspense fallback=|| ()>
+      {move || {
+        post_data.with(cx, |data| {
+          view! { cx,
+            <Title text=data.title/>
+            <Meta name="description" content=data.excerpt/>
+            <article>
+            /* render the post content */
+            </article>
+          }
+        })
+      }}
+      </Suspense>
+      <Suspense fallback=|| "Loading comments...">
+      /* render comment data here */
+      </Suspense>
+    }
+  }
 */
 
-// For a path that includes multiple nested routes, the most restrictive
-// mode will be used: i.e., if even a single nested route asks for async
-// rendering, the whole initial request will be rendered async. async is
-// the most restricted requirement, followed by in-order, and then
-// out-of-order. (This probably makes sense if you think about it for a
-// few minutes.)
+// The first <Suspense/>, with the body of the blog post, will block my
+// HTML stream, because it reads from a blocking resource. The second
+// <Suspense/>, with the comments, will not block the stream. Blocking
+// resources gave me exactly the power and granularity I needed to
+// optimize my page for SEO and user experience.
 
 use leptos::*;
 pub fn main() {
     mount_to_body(|cx| {
-        view! { cx, <h1>"Server Side Rendering - Using SSR Modes"</h1> }
+        view! { cx, <h1>"Server Side Rendering - Blocking Resources"</h1> }
     });
 }
