@@ -1,32 +1,33 @@
-/* 12.3.3 Server Side Rendering - In-Order Streaming */
+/* 12.3.4 Server Side Rendering - Out-of-Order Streaming */
 
-// For example page see https://leptos-rs.github.io/leptos/ssr/23_ssr_modes.html#in-order-streaming
+// For example page see https://leptos-rs.github.io/leptos/ssr/23_ssr_modes.html#out-of-order-streaming
 
-// ------------------
-// In-Order Streaming
-// ------------------
+// ----------------------
+// Out-of-Order Streaming
+// ----------------------
 
-// In-order streaming: Walk through the component tree, rendering HTML
-// until you hit a <Suspense/>. Send down all the HTML you’ve got so far
-// as a chunk in the stream, wait for all the resources accessed under
-// the <Suspense/> to load, then render it to HTML and keep walking until
-// you hit another <Suspense/> or the end of the page.
+// Out-of-order streaming: Like synchronous rendering, serve an HTML
+// shell that includes fallback for any <Suspense/>. But load data on
+// the server, streaming it down to the client as it resolves, and
+// streaming down HTML for <Suspense/> nodes, which is swapped in to
+// replace the fallback.
 
-// Pros:
-//    Rather than a blank screen, shows at least something before the
-//      data are ready.
-// Cons
-//    Loads the shell more slowly than synchronous rendering (or
-//      out-of-order streaming) because it needs to pause at every
-//      <Suspense/>.
-//    Unable to show fallback states for <Suspense/>.
-//    Can’t begin hydration until the entire page has loaded, so earlier
-//      pieces of the page will not be interactive until the suspended
-//      chunks have loaded.
+// Pros: Combines the best of synchronous and async.
+//    Fast initial response/TTFB because it immediately sends the whole
+//      synchronous shell
+//    Fast total time because resources begin loading on the server.
+//    Able to show the fallback loading state and dynamically replace
+//      it, instead of showing blank sections for un-loaded data.
+
+// Cons: Requires JavaScript to be enabled for suspended fragments to
+//    appear in correct order. (This small chunk of JS is streamed down
+//    in a <script> tag alongside the <template> tag that contains the
+//    rendered <Suspense/> fragment, so it does not need to load any
+//    additional JS files.)
 
 use leptos::*;
 pub fn main() {
     mount_to_body(|cx| {
-        view! { cx, <h1>"Server Side Rendering - In-Order Streaming"</h1> }
+        view! { cx, <h1>"Server Side Rendering - Out-of-Order Streaming"</h1> }
     });
 }
