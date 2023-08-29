@@ -1,127 +1,50 @@
-/* 12.2 Server Side Rendering - The Life of a Page Load */
+/* 12.3.0 Server Side Rendering - Async Rendering and SSR “Modes” */
 
-// Before we get into the weeds it might be helpful to have a
-// higher-level overview. What exactly happens between the moment you
-// type in the URL of a server-rendered Leptos app, and the moment you
-// click a button and a counter increases?
+// Server-rendering a page that uses only synchronous data is pretty
+// simple: You just walk down the component tree, rendering each element
+// to an HTML string. But this is a pretty big caveat: it doesn’t answer
+// the question of what we should do with pages that includes
+// asynchronous data, i.e., the sort of stuff that would be rendered
+// under a <Suspense/> node on the client.
 
-// I’m assuming some basic knowledge of how the Internet works here,
-// and won’t get into the weeds about HTTP or whatever. Instead, I’ll
-// try to show how different parts of the Leptos APIs map onto each
-// part of the process.
+// When a page loads async data that it needs to render, what should
+// we do? Should we wait for all the async data to load, and then render
+// everything at once? (Let’s call this “async” rendering) Should we go
+// all the way in the opposite direction, just sending the HTML we have
+// immediately down to the client and letting the client load the
+// resources and fill them in? (Let’s call this “synchronous” rendering)
+// Or is there some middle-ground solution that somehow beats them both?
+// (Hint: There is.)
 
-// This description also starts from the premise that your app is being
-// compiled for two separate targets:
+// If you’ve ever listened to streaming music or watched a video online,
+// I’m sure you realize that HTTP supports streaming, allowing a single
+// connection to send chunks of data one after another without waiting
+// for the full content to load. You may not realize that browsers are
+// also really good at rendering partial HTML pages. Taken together,
+// this means that you can actually enhance your users’ experience by
+// streaming HTML: and this is something that Leptos supports out of the
+// box, with no configuration at all. And there’s actually more than one
+// way to stream HTML: you can stream the chunks of HTML that make up
+// your page in order, like frames of a video, or you can stream them...
+// well, out of order.
 
-// 1. A server version, often running on Actix or Axum, compiled with
-//    the Leptos ssr feature
-// 2. A browser version, compiled to WebAssembly (WASM) with the Leptos
-//    hydrate feature
+// Let me say a little more about what I mean.
 
-// The cargo-leptos build tool exists to coordinate the process of
-// compiling your app for these two different targets.
+// Leptos supports all four different modes of rendering HTML that
+// includes asynchronous data:
 
-// -------------
-// On the Server
-// -------------
-
-// - Your browser makes a GET request for that URL to your server. At
-//    this point, the browser knows almost nothing about the page that’s
-//    going to be rendered. (The question “How does the browser know
-//    where to ask for the page?” is an interesting one, but out of the
-//    scope of this tutorial!)
-// - The server receives that request, and checks whether it has a way
-//    to handle a GET request at that path. This is what the
-//    .leptos_routes() methods in leptos_axum and leptos_actix are for.
-//    When the server starts up, these methods walk over the routing
-//    structure you provide in <Routes/>, generating a list of all
-//    possible routes your app can handle and telling the server’s
-//    router “for each of these routes, if you get a request... hand it
-//    off to Leptos.”
-// - The server sees that this route can be handled by Leptos. So it
-//    renders your root component (often called something like <App/>),
-//    providing it with the URL that’s being requested and some other
-//    data like the HTTP headers and request metadata.
-// - Your application runs once on the server, building up an HTML
-//    version of the component tree that will be rendered at that route.
-//    (There’s more to be said here about resources and <Suspense/> in
-//    the next chapter.)
-// - The server returns this HTML page, also injecting information on
-//    how to load the version of your app that has been compiled to WASM
-//    so that it can run in the browser.
-
-// The HTML page that’s returned is essentially your app, “dehydrated”
-// or “freeze-dried”: it is HTML without any of the reactivity or event
-// listeners you’ve added. The browser will “rehydrate” this HTML page
-// by adding the reactive system and attaching event listeners to that
-// server-rendered HTML. Hence the two feature flags that apply to the
-// two halves of this process: ssr on the server for “server-side
-// rendering”, and hydrate in the browser for the process of rehydration.
-
-// --------------
-// In the Browser
-// --------------
-
-// - The browser receives this HTML page from the server. It immediately
-//    goes back to the server to begin loading the JS and WASM necessary
-//    to run the interactive, client side version of the app.
-// - In the meantime, it renders the HTML version.
-// - When the WASM version has reloaded, it does the same route-matching
-//    process that the server did. Because the <Routes/> component is
-//    identical on the server and in the client, the browser version will
-//    read the URL and render the same page that was already returned by
-//    the server.
-// - During this initial “hydration” phase, the WASM version of your app
-//    doesn’t re-create the DOM nodes that make up your application.
-//    Instead, it walks over the existing HTML tree, “picking up”
-//    existing elements and adding the necessary interactivity.
-
-// Note that there are some trade-offs here. Before this hydration
-// process is complete, the page will appear interactive but won’t
-// actually respond to interactions. For example, if you have a
-// counter button and click it before WASM has loaded, the count will
-// not increment, because the necessary event listeners and reactivity
-// have not been added yet. We’ll look at some ways to build in “graceful
-// degradation” in future chapters.
-
-// ----------------------
-// Client-Side Navigation
-// ----------------------
-
-// The next step is very important. Imagine that the user now clicks a
-// link to navigate to another page in your application.
-
-// The browser will not make another round trip to the server, reloading
-// the full page as it would for navigating between plain HTML pages or
-// an application that uses server rendering (for example with PHP) but
-// without a client-side half.
-
-// Instead, the WASM version of your app will load the new page, right
-// there in the browser, without requesting another page from the server.
-// Essentially, your app upgrades itself from a server-loaded “multi-page
-// app” into a browser-rendered “single-page app.” This yields the best
-// of both worlds: a fast initial load time due to the server-rendered
-// HTML, and fast secondary navigations because of the client-side
-// routing.
-
-// Some of what will be described in the following chapters, like the
-// interactions between server functions, resources, and <Suspense/>,
-// may seem overly complicated. You might find yourself asking, “If my
-// page is being rendered to HTML on the server, why can’t I just .await
-// this on the server? If I can just call library X in a server function,
-// why can’t I call it in my component?” The reason is pretty simple: to
-// enable the upgrade from server rendering to client rendering,
-// everything in your application must be able to run either on the
-// server or in the browser.
-
-// This is not the only way to create a website or web framework, of
-// course. But it’s the most common way, and we happen to think it’s
-// quite a good way, to create the smoothest possible experience for
-// your users.
+// 1. Synchronous Rendering
+//    https://leptos-rs.github.io/leptos/ssr/23_ssr_modes.html#synchronous-rendering
+// 2. Async Rendering
+//    https://leptos-rs.github.io/leptos/ssr/23_ssr_modes.html#async-rendering
+// 3. In-Order streaming
+//    https://leptos-rs.github.io/leptos/ssr/23_ssr_modes.html#in-order-streaming
+// 4. Out-of-Order Streaming
+//    https://leptos-rs.github.io/leptos/ssr/23_ssr_modes.html#out-of-order-streaming
 
 use leptos::*;
 pub fn main() {
     mount_to_body(|cx| {
-        view! { cx, <h1>"Server Side Rendering - The Life of a Page Load"</h1> }
+        view! { cx, <h1>"Server Side Rendering - Async Rendering and SSR 'Modes'"</h1> }
     });
 }
