@@ -1,33 +1,36 @@
-/* 12.3.4 Server Side Rendering - Out-of-Order Streaming */
+/* 12.3.5 Server Side Rendering - Partially-blocked Streaming */
 
-// For example page see https://leptos-rs.github.io/leptos/ssr/23_ssr_modes.html#out-of-order-streaming
+// ---------------------------
+// Partially-blocked Streaming
+// ---------------------------
 
-// ----------------------
-// Out-of-Order Streaming
-// ----------------------
+// Partially-blocked streaming: “Partially-blocked” streaming is useful
+// when you have multiple separate <Suspense/> components on the page.
+// If one of them reads from one or more “blocking resources” (see below),
+// the fallback will not be sent; rather, the server will wait until that
+// <Suspense/> has resolved and then replace the fallback with the
+// resolved fragment on the server, which means that it is included in
+// the initial HTML response and appears even if JavaScript is disabled
+// or not supported. Other <Suspense/> stream in out of order as usual.
 
-// Out-of-order streaming: Like synchronous rendering, serve an HTML
-// shell that includes fallback for any <Suspense/>. But load data on
-// the server, streaming it down to the client as it resolves, and
-// streaming down HTML for <Suspense/> nodes, which is swapped in to
-// replace the fallback.
+// This is useful when you have multiple <Suspense/> on the page, and one
+// is more important than the other: think of a blog post and comments,
+// or product information and reviews. It is not useful if there’s only
+// one <Suspense/>, or if every <Suspense/> reads from blocking resources.
+// In those cases it is a slower form of async rendering.
 
-// Pros: Combines the best of synchronous and async.
-//    Fast initial response/TTFB because it immediately sends the whole
-//      synchronous shell
-//    Fast total time because resources begin loading on the server.
-//    Able to show the fallback loading state and dynamically replace
-//      it, instead of showing blank sections for un-loaded data.
-
-// Cons: Requires JavaScript to be enabled for suspended fragments to
-//    appear in correct order. (This small chunk of JS is streamed down
-//    in a <script> tag alongside the <template> tag that contains the
-//    rendered <Suspense/> fragment, so it does not need to load any
-//    additional JS files.)
+// Pros:
+//    Works if JavaScript is disabled or not supported on the user’s
+//    device.
+// Cons:
+//    Slower initial response time than out-of-order.
+//    Marginally slower overall response due to additional work on the
+//      server.
+//    No fallback state shown.
 
 use leptos::*;
 pub fn main() {
     mount_to_body(|cx| {
-        view! { cx, <h1>"Server Side Rendering - Out-of-Order Streaming"</h1> }
+        view! { cx, <h1>"Server Side Rendering - Partially-blocked Streaming"</h1> }
     });
 }
