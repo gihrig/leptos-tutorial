@@ -1,38 +1,17 @@
-use crate::error_template::{AppError, ErrorTemplate};
 use leptos::*;
-use leptos_meta::*;
-use leptos_router::*;
 
+// Demonstrate Client/Server Mismatched error
+// Expect blank screen and errors in browser console
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
-    // Provides context that manages stylesheets, titles, meta tags, etc.
-    provide_meta_context(cx);
-
-    view! {
-        cx,
-        // injects a stylesheet into the document <head>
-        // id=leptos means cargo-leptos will hot-reload this stylesheet
-        <Stylesheet id="leptos" href="/pkg/leptos-tutorial.css"/>
-
-        // sets the document title
-        <Title text="Welcome to Leptos"/>
-
-        // content for this welcome page
-        <Router fallback=|cx| {
-            let mut outside_errors = Errors::default();
-            outside_errors.insert_with_default_key(AppError::NotFound);
-            view! { cx,
-                <ErrorTemplate outside_errors/>
-            }
-            .into_view(cx)
-        }>
-            <main>
-                <Routes>
-                    <Route path="" view=|cx| view! { cx, <HomePage/> }/>
-                </Routes>
-            </main>
-        </Router>
-    }
+    let data = if cfg!(target_arch = "wasm32") {
+        vec![0, 1, 2]
+    } else {
+        vec![]
+    };
+    data.into_iter()
+        .map(|value| view! { cx, <span>{value}</span> })
+        .collect_view(cx)
 }
 
 /// Renders the home page of your application.
@@ -41,8 +20,7 @@ fn HomePage(cx: Scope) -> impl IntoView {
     // Creates a reactive value to update the button
     let (count, set_count) = create_signal(cx, 0);
     let on_click = move |_| set_count.update(|count| *count += 1);
-    // >>>> A thought experiment <<<<<
-    leptos::log!("where do I run?");
+
     view! { cx,
         <h1>"Welcome to Leptos!"</h1>
         <button on:click=on_click>"Click Me: " {count}</button>
