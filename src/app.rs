@@ -1,17 +1,27 @@
 use leptos::*;
 
-// Demonstrate Client/Server Mismatched error
-// Expect blank screen and errors in browser console
+// Demonstrate DOM Mutation During Rendering error
+// Does not panic as stated in the text (main.rs) but
+// always displays the "Loading..." if branch.
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
-    let data = if cfg!(target_arch = "wasm32") {
-        vec![0, 1, 2]
-    } else {
-        vec![]
-    };
-    data.into_iter()
-        .map(|value| view! { cx, <span>{value}</span> })
-        .collect_view(cx)
+    let (loaded, set_loaded) = create_signal(cx, false);
+
+    // create_effect only runs on the client
+    create_effect(cx, move |_| {
+        // do something like reading from localStorage
+        // set_loaded(true); <--- Error: Stuck in "loading...
+        // Solution: use requestAnimationFrame to update state
+        request_animation_frame(move || set_loaded(true));
+    });
+
+    move || {
+        if loaded() {
+            view! { cx, <p>"Hello, world!"</p> }.into_any()
+        } else {
+            view! { cx, <div class="loading">"Loading..."</div> }.into_any()
+        }
+    }
 }
 
 /// Renders the home page of your application.

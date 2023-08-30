@@ -1,7 +1,7 @@
-/* 12.4.1 Server Side Rendering - Hydration Bugs Client/Serve Mismatch */
+/* 12.4.2 Server Side Rendering - Hydration Bugs DOM Mutation */
 
 // ----------------------------------------------
-// Hydration Bugs - Client Server Code Mismatches
+// Hydration Bugs - DOM Mutation During Rendering
 // ----------------------------------------------
 
 // The Potential for Bugs
@@ -16,53 +16,61 @@
 
 // --------------------------------------------------------
 
-// Mismatches between server and client code
+// DOM Mutation During Rendering
 
-// One way to create a bug is by creating a mismatch between the HTML
-// that’s sent down by the server and what’s rendered on the client.
-// It’s actually fairly hard to do this unintentionally, I think (at
-// least judging by the bug reports I get from people.) But imagine I
-// do something like this
+// This is a slightly more common way to create a client/server mismatch:
+// updating a signal during rendering in a way that mutates the view.
 
 /*
   #[component]
   pub fn App(cx: Scope) -> impl IntoView {
-    let data = if cfg!(target_arch = "wasm32") {
-      vec![0, 1, 2]
-    } else {
-      vec![]
-    };
-    data.into_iter()
-    .map(|value| view! { cx, <span>{value}</span> })
-    .collect_view(cx)
-  }
+    let (loaded, set_loaded) = create_signal(cx, false);
+
+    // create_effect only runs on the client
+    create_effect(cx, move |_| {
+      // do something like reading from localStorage
+      set_loaded(true);
+    });
+
+      move || {
+        if loaded() {
+          view! { cx, <p>"Hello, world!"</p> }.into_any()
+        } else {
+          view! { cx, <div class="loading">"Loading..."</div> }.into_any()
+        }
+      }
+    }
 */
 
-// In other words, if this is being compiled to WASM, it has three items;
-// otherwise it’s empty.
-
-// When I load the page in the browser, I see nothing. If I open the
-// console I see a bunch of warnings:
-
+// This one gives us the scary panic <--- not true! see app.rs
 /*
-  element with id 0-3 not found, ignoring it for hydration
-  element with id 0-4 not found, ignoring it for hydration
-  element with id 0-5 not found, ignoring it for hydration
-  component with id _0-6c not found, ignoring it for hydration
-  component with id _0-6o not found, ignoring it for hydration
+  panicked at 'assertion failed: `(left == right)`
+    left: `"DIV"`,
+  right: `"P"`: SSR and CSR elements have the same hydration key but different node kinds.
 */
 
-// The WASM version of your app, running in the browser, expects to find
-// three items; but the HTML has none.
+// The problem here is that create_effect runs immediately and
+// synchronously, but only in the browser. As a result, on the server,
+// loaded is false, and a <div> is rendered. But on the browser, by the
+// time the view is being rendered, loaded has already been set to true,
+// and the browser is expecting to find a <p>.
 
 // Solution
 
-// It’s pretty rare that you do this intentionally, but it could happen
-// from somehow running different logic on the server and in the browser.
-// If you’re seeing warnings like this and you don’t think it’s your
-// fault, it’s much more likely that it’s a bug with <Suspense/> or
-// something. Feel free to go ahead and open an issue or discussion on
-// GitHub for help.
+// You can simply tell the effect to wait a tick before updating the
+// signal, by using something like request_animation_frame, which will
+// set a short timeout and then update the signal before the next frame.
+
+/*
+  create_effect(cx, move |_| {
+    // do something like reading from localStorage
+    request_animation_frame(move || set_loaded(true));
+  });
+*/
+
+// This allows the browser to hydrate with the correct, matching state
+// (loaded is false when it reaches the view), then immediately update
+// it to true once hydration is complete.
 
 // See src/app.rs for demonstration of this error
 // ----------------------------------------------
