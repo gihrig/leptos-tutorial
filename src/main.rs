@@ -1,68 +1,135 @@
-/* 12.3.7 Server Side Rendering - Blocking Resources */
+/* 12.4.0 Server Side Rendering - Hydration Bugs A Thought Experiment */
 
-// ------------------
-// Blocking Resources
-// ------------------
+// -------------------------------------
+// Hydration Bugs - A Thought Experiment
+// -------------------------------------
 
-// Any Leptos versions later than 0.2.5 (i.e., git main and 0.3.x or
-// later) introduce a new resource primitive with
-// `create_blocking_resource`. A blocking resource still loads
-// asynchronously like any other async/.await in Rust; it doesn’t
-// block a server thread or anything. Instead, reading from a blocking
-// resource under a <Suspense/> blocks the HTML stream from returning
-// anything, including its initial synchronous shell, until that
-// <Suspense/> has resolved.
+// Let’s try an experiment to test your intuitions. Open up an app
+// you’re server-rendering with cargo-leptos. (If you’ve just been
+// using trunk so far to play with examples, go clone a cargo-leptos
+// template just for the sake of this exercise.)
 
-// Now from a performance perspective, this is not ideal. None of the
-// synchronous shell for your page will load until that resource is
-// ready. However, rendering nothing means that you can do things like
-// set the <title> or <meta> tags in your <head> in actual HTML. This
-// sounds a lot like async rendering, but there’s one big difference:
-// if you have multiple <Suspense/> sections, you can block on one of
-// them but still render a placeholder and then stream in the other.
-
-// For example, think about a blog post. For SEO and for social sharing,
-// I definitely want my blog post’s title and metadata in the initial
-// HTML <head>. But I really don’t care whether comments have loaded
-// yet or not; I’d like to load those as lazily as possible.
-
-// With blocking resources, I can do something like this:
+// Put a log somewhere in your root component. (I usually call mine
+// <App/>, but anything will do.)
 
 /*
   #[component]
-  pub fn BlogPost(cx: Scope) -> impl IntoView {
-    let post_data = create_blocking_resource(cx /* load blog post */);
-    let comment_data = create_resource(cx /* load blog post */);
-    view! { cx,
-      <Suspense fallback=|| ()>
-      {move || {
-        post_data.with(cx, |data| {
-          view! { cx,
-            <Title text=data.title/>
-            <Meta name="description" content=data.excerpt/>
-            <article>
-            /* render the post content */
-            </article>
-          }
-        })
-      }}
-      </Suspense>
-      <Suspense fallback=|| "Loading comments...">
-      /* render comment data here */
-      </Suspense>
-    }
+  pub fn App(cx: Scope) -> impl IntoView {
+    leptos::log!("where do I run?");
+    // ... whatever
   }
 */
 
-// The first <Suspense/>, with the body of the blog post, will block my
-// HTML stream, because it reads from a blocking resource. The second
-// <Suspense/>, with the comments, will not block the stream. Blocking
-// resources gave me exactly the power and granularity I needed to
-// optimize my page for SEO and user experience.
+// And let’s fire it up
 
-use leptos::*;
-pub fn main() {
-    mount_to_body(|cx| {
-        view! { cx, <h1>"Server Side Rendering - Blocking Resources"</h1> }
-    });
+/*
+  cargo leptos watch
+*/
+
+// Where do you expect "where do I run?"" to log?
+
+//  In the command line where you’re running the server?
+//  In the browser console when you load the page?
+//  Neither?
+//  Both?
+
+// `trunk serve --open` logs in the browser console
+//    Requires simple trunk compatible app as shown below
+// `cargo leptos watch` logs in the command line and the Browser
+//    Requires more complex trunk compatible app as shown below
+// Try it out.
+
+// Trunk compatible app
+// --------------------
+// #[component]
+// pub fn App(cx: Scope) -> impl IntoView {
+//     leptos::log!("where do I run?");
+// }
+
+// use leptos::*;
+// pub fn main() {
+//     mount_to_body(|cx| {
+//         view! { cx,
+//           <h1>"Server Side Rendering - Hydration Bugs"</h1>
+//           <h2>"A Thought Experiment"</h2>
+//           <App/>
+//         }
+//     });
+// }
+
+// cargo leptos compatible app - based on leptos-start-axum
+// --------------------------------------------------------
+
+#[cfg(feature = "ssr")]
+#[tokio::main]
+async fn main() {
+    use axum::{routing::post, Router};
+    use leptos::*;
+    use leptos_axum::{generate_route_list, LeptosRoutes};
+    use leptos_tutorial::{app::*, fileserve::file_and_error_handler};
+
+    leptos::log!("Running with feature = 'ssr'");
+    simple_logger::init_with_level(log::Level::Info)
+        .expect("couldn't initialize logging");
+
+    // Setting get_configuration(None) means we'll be using cargo-leptos's env values
+    // For deployment these variables are:
+    // <https://github.com/leptos-rs/start-axum#executing-a-server-on-a-remote-machine-without-the-toolchain>
+    // Alternately a file can be specified such as Some("Cargo.toml")
+    // The file would need to be included with the executable when moved to deployment
+    let conf = get_configuration(None).await.unwrap();
+    let leptos_options = conf.leptos_options;
+    let addr = leptos_options.site_addr;
+    let routes = generate_route_list(|cx| view! { cx, <App/> }).await;
+
+    // build our application with a route
+    let app = Router::new()
+        .route("/api/*fn_name", post(leptos_axum::handle_server_fns))
+        .leptos_routes(&leptos_options, routes, |cx| view! { cx, <App/> })
+        .fallback(file_and_error_handler)
+        .with_state(leptos_options);
+
+    // run our app with hyper
+    // `axum::Server` is a re-export of `hyper::Server`
+    log!("listening on http://{}", &addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
 }
+
+#[cfg(not(feature = "ssr"))]
+pub fn main() {
+    // This log never runs, even with feature = 'csr'
+    leptos::log!("Running with feature = 'csr'");
+    // no client-side main function
+    // unless we want this to work with e.g., Trunk for a purely
+    // client-side app
+    // see lib.rs for hydration function instead
+}
+
+// Discussion continued
+// ----------------------------------------------------------------
+
+// Okay, consider the spoiler alerted.
+
+// You’ll notice of course that it logs in both places, assuming
+// everything goes according to plan. In fact on the server it logs
+// twice—first during the initial server startup, when Leptos renders
+// your app once to extract the route tree, then a second time when
+// you make a request. Each time you reload the page, "where do I run?"
+// should log once on the server and once on the client.
+
+// If you think about the description in the last couple sections,
+// hopefully this makes sense. Your application runs once on the server,
+// where it builds up a tree of HTML which is sent to the client. During
+// this initial render, "where do I run?" logs on the server.
+
+// Once the WASM binary has loaded in the browser, your application
+// runs a second time, walking over the same user interface tree and
+// adding interactivity.
+
+// Does that sound like a waste? It is, in a sense. But reducing that
+// waste is a genuinely hard problem. It’s what some JS frameworks like
+// Qwik are intended to solve, although it’s probably too early to tell
+// whether it’s a net performance gain as opposed to other approaches.
