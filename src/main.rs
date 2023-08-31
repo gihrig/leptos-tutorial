@@ -1,27 +1,48 @@
-/* 13.0 Working with the Server */
+/* 13.1.0 Working with the Server - Server Functions */
 
-// The previous section described the process of server-side rendering,
-// using the server to generate an HTML version of the page that will
-// become interactive in the browser. So far, everything has been
-// “isomorphic” or “universal”; in other words, your app has had the
-// “same (iso) shape (morphe)” on the client and the server.
+// If you’re creating anything beyond a toy app, you’ll need to run
+// code on the server all the time: reading from or writing to a
+// database that only runs on the server, running expensive
+// computations using libraries you don’t want to ship down to the
+// client, accessing APIs that need to be called from the server
+// rather than the client for CORS reasons or because you need a
+// secret API key that’s stored on the server and definitely
+// shouldn’t be shipped down to a user’s browser.
 
-// But a server can do a lot more than just render HTML! In fact, a
-// server can do a whole bunch of things your browser can’t, like
-// reading from and writing to a SQL database.
+// Traditionally, this is done by separating your server and client
+// code, and by setting up something like a REST API or GraphQL API
+// to allow your client to fetch and mutate data on the server. This
+// is fine, but it requires you to write and maintain your code in
+// multiple separate places (client-side code for fetching, server-side
+// functions to run), as well as creating a third thing to manage,
+// which is the API contract between the two.
 
-// If you’re used to building JavaScript frontend apps, you’re probably
-// used to calling out to some kind of REST API to do this sort of server
-// work. If you’re used to building sites with PHP or Python or Ruby (or
-// Java or C# or...), this server-side work is your bread and butter,
-// and it’s the client-side interactivity that tends to be an
-// afterthought.
+// Leptos is one of a number of modern frameworks that introduce the
+// concept of server functions. Server functions have two key
+// characteristics:
 
-// With Leptos, you can do both: not only in the same language, not only
-// sharing the same types, but even in the same files!
-
-// This section will talk about how to build the uniquely-server-side
-// parts of your application.
+// 1. Server functions are co-located with your component code, so that
+//    you can organize your work by feature, not by technology. For
+//    example, you might have a “dark mode” feature that should persist
+//    a user’s dark/light mode preference across sessions, and be
+//    applied during server rendering so there’s no flicker. This
+//    requires a component that needs to be interactive on the client,
+//    and some work to be done on the server (setting a cookie, maybe
+//    even storing a user in a database.) Traditionally, this feature
+//    might end up being split between two different locations in your
+//    code, one in your “frontend” and one in your “backend.” With
+//    server functions, you’ll probably just write them both in one
+//    dark_mode.rs and forget about it.
+// 2. Server functions are isomorphic, i.e., they can be called either
+//    from the server or the browser. This is done by generating code
+//    differently for the two platforms. On the server, a server
+//    function simply runs. In the browser, the server function’s body
+//    is replaced with a stub that actually makes a fetch request to
+//    the server, serializing the arguments into the request and
+//    deserializing the return value from the response. But on either
+//    end, the function can simply be called: you can create an add_todo
+//    function that writes to your database, and simply call it from a
+//    click handler on a button in the browser!
 
 // Example app not used in this chapter.
 // --------------------------------------------------------
