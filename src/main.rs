@@ -1,7 +1,7 @@
-/* 12.4.3 Server Side Rendering - Hydration Bugs Client Code on Server */
+/* 12.4.4 Server Side Rendering - Hydration Bugs Server Code on Client */
 
 // ----------------------------------------------
-// Hydration Bugs Client Code Can't Run on Server
+// Hydration Bugs Server Code Can't Run on Client
 // ----------------------------------------------
 
 // The Potential for Bugs
@@ -16,72 +16,30 @@
 
 // --------------------------------------------------------
 
-// Some Client Code Can't Run on Server
+// Some Server Code Can't Run on Client
 
-// Imagine you happily import a dependency like gloo-net that you’ve
-// been used to using to make requests in the browser, and use it in a
-// create_resource in a server-rendered app.
+// WebAssembly running in the browser is a pretty limited environment.
+// You don’t have access to a file-system or to many of the other things
+// the standard library may be used to having. Not every crate can even
+// be compiled to WASM, let alone run in a WASM environment.
 
-// You’ll probably instantly see the dreaded message
+// In particular, you’ll sometimes see errors about the crate mio or
+// missing things from core. This is generally a sign that you are
+// trying to compile something to WASM that can’t be compiled to WASM.
+// If you’re adding server-only dependencies, you’ll want to mark them
+// optional = true in your Cargo.toml and then enable them in the ssr
+// feature definition e.g. `axum = { version = "0.6.4", optional = true }`
 
-/*
-  panicked at 'cannot call wasm-bindgen imported functions on non-wasm
-  targets'
-*/
+// You can use create_effect to specify that something should only run
+// on the client, and not in the server. Is there a way to specify that
+// something should run only on the server, and not the client?
 
-// Uh-oh.
+// In fact, there is. The next chapter will cover the topic of server
+// functions in some detail. Leptos Server Functions are documented here:
+// https://docs.rs/leptos_server/latest/leptos_server/index.html
 
-// But of course this makes sense. We’ve just said that your app needs
-// to run on the client and the server.
-
-// Solution
-
-// There are a few ways to avoid this:
-
-// 1. Only use libraries that can run on both the server and the client.
-//    `reqwest`, for example, works for making HTTP requests in both
-//    settings.
-// 2. Use different libraries on the server and the client, and gate them
-//    using the #[cfg] macro. Example here:
-//    https://github.com/leptos-rs/leptos/blob/main/examples/hackernews/src/api.rs
-// 3. Wrap client-only code in create_effect. Because create_effect only
-//    runs on the client, this can be an effective way to access browser
-//    APIs that are not needed for initial rendering.
-
-// For example, say that I want to store something in the browser’s
-// localStorage whenever a signal changes.
-
-/*
-  #[component]
-  pub fn App(cx: Scope) -> impl IntoView {
-    use gloo_storage::Storage;
-    let storage = gloo_storage::LocalStorage::raw();
-    leptos::log!("{storage:?}");
-  }
-*/
-
-// This panics because I can’t access LocalStorage during server
-// rendering.
-
-// But if I wrap it in create_effect...
-
-/*
-  #[component]
-  pub fn App(cx: Scope) -> impl IntoView {
-    use gloo_storage::Storage;
-    create_effect(cx, move |_| {
-      let storage = gloo_storage::LocalStorage::raw();
-      leptos::log!("{storage:?}");
-    });
-  }
-*/
-
-// It’s fine! This will render appropriately on the server, ignoring
-// the client-only code, and then access the storage and log a message
-// on the browser.
-
-// See src/app.rs for demonstration of this error
-// ----------------------------------------------
+// Example app not used in this chapter.
+// --------------------------------------------------------
 
 #[cfg(feature = "ssr")]
 #[tokio::main]

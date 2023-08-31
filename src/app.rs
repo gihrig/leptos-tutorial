@@ -3,19 +3,9 @@ use leptos::*;
 // Demonstrate Client Code Can't Run on Server error
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
-    use gloo_storage::Storage;
-    // panicked at 'cannot call wasm-bindgen imported functions on non-wasm targets'
-    // let storage = gloo_storage::LocalStorage::raw();
-    // leptos::log!("{storage:?}");
-
-    // Solution wrap `storage...` in create_effect
-    create_effect(cx, move |_| {
-        let storage = gloo_storage::LocalStorage::raw();
-        leptos::log!("{storage:?}");
-    });
-
     view! { cx,
       <h1>"Hello, World, it works!"</h1>
+      <h2>"This code is from src/app.rs"</h2>
     }
 }
 
