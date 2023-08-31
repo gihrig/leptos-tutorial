@@ -1,26 +1,21 @@
 use leptos::*;
 
-// Demonstrate DOM Mutation During Rendering error
-// Does not panic as stated in the text (main.rs) but
-// always displays the "Loading..." if branch.
+// Demonstrate Client Code Can't Run on Server error
 #[component]
 pub fn App(cx: Scope) -> impl IntoView {
-    let (loaded, set_loaded) = create_signal(cx, false);
+    use gloo_storage::Storage;
+    // panicked at 'cannot call wasm-bindgen imported functions on non-wasm targets'
+    // let storage = gloo_storage::LocalStorage::raw();
+    // leptos::log!("{storage:?}");
 
-    // create_effect only runs on the client
+    // Solution wrap `storage...` in create_effect
     create_effect(cx, move |_| {
-        // do something like reading from localStorage
-        // set_loaded(true); <--- Error: Stuck in "loading...
-        // Solution: use requestAnimationFrame to update state
-        request_animation_frame(move || set_loaded(true));
+        let storage = gloo_storage::LocalStorage::raw();
+        leptos::log!("{storage:?}");
     });
 
-    move || {
-        if loaded() {
-            view! { cx, <p>"Hello, world!"</p> }.into_any()
-        } else {
-            view! { cx, <div class="loading">"Loading..."</div> }.into_any()
-        }
+    view! { cx,
+      <h1>"Hello, World, it works!"</h1>
     }
 }
 

@@ -1,7 +1,7 @@
-/* 12.4.2 Server Side Rendering - Hydration Bugs DOM Mutation */
+/* 12.4.3 Server Side Rendering - Hydration Bugs Client Code on Server */
 
 // ----------------------------------------------
-// Hydration Bugs - DOM Mutation During Rendering
+// Hydration Bugs Client Code Can't Run on Server
 // ----------------------------------------------
 
 // The Potential for Bugs
@@ -16,61 +16,69 @@
 
 // --------------------------------------------------------
 
-// DOM Mutation During Rendering
+// Some Client Code Can't Run on Server
 
-// This is a slightly more common way to create a client/server mismatch:
-// updating a signal during rendering in a way that mutates the view.
+// Imagine you happily import a dependency like gloo-net that you’ve
+// been used to using to make requests in the browser, and use it in a
+// create_resource in a server-rendered app.
+
+// You’ll probably instantly see the dreaded message
+
+/*
+  panicked at 'cannot call wasm-bindgen imported functions on non-wasm
+  targets'
+*/
+
+// Uh-oh.
+
+// But of course this makes sense. We’ve just said that your app needs
+// to run on the client and the server.
+
+// Solution
+
+// There are a few ways to avoid this:
+
+// 1. Only use libraries that can run on both the server and the client.
+//    `reqwest`, for example, works for making HTTP requests in both
+//    settings.
+// 2. Use different libraries on the server and the client, and gate them
+//    using the #[cfg] macro. Example here:
+//    https://github.com/leptos-rs/leptos/blob/main/examples/hackernews/src/api.rs
+// 3. Wrap client-only code in create_effect. Because create_effect only
+//    runs on the client, this can be an effective way to access browser
+//    APIs that are not needed for initial rendering.
+
+// For example, say that I want to store something in the browser’s
+// localStorage whenever a signal changes.
 
 /*
   #[component]
   pub fn App(cx: Scope) -> impl IntoView {
-    let (loaded, set_loaded) = create_signal(cx, false);
+    use gloo_storage::Storage;
+    let storage = gloo_storage::LocalStorage::raw();
+    leptos::log!("{storage:?}");
+  }
+*/
 
-    // create_effect only runs on the client
+// This panics because I can’t access LocalStorage during server
+// rendering.
+
+// But if I wrap it in create_effect...
+
+/*
+  #[component]
+  pub fn App(cx: Scope) -> impl IntoView {
+    use gloo_storage::Storage;
     create_effect(cx, move |_| {
-      // do something like reading from localStorage
-      set_loaded(true);
+      let storage = gloo_storage::LocalStorage::raw();
+      leptos::log!("{storage:?}");
     });
-
-      move || {
-        if loaded() {
-          view! { cx, <p>"Hello, world!"</p> }.into_any()
-        } else {
-          view! { cx, <div class="loading">"Loading..."</div> }.into_any()
-        }
-      }
-    }
+  }
 */
 
-// This one gives us the scary panic <--- not true! see app.rs
-/*
-  panicked at 'assertion failed: `(left == right)`
-    left: `"DIV"`,
-  right: `"P"`: SSR and CSR elements have the same hydration key but different node kinds.
-*/
-
-// The problem here is that create_effect runs immediately and
-// synchronously, but only in the browser. As a result, on the server,
-// loaded is false, and a <div> is rendered. But on the browser, by the
-// time the view is being rendered, loaded has already been set to true,
-// and the browser is expecting to find a <p>.
-
-// Solution
-
-// You can simply tell the effect to wait a tick before updating the
-// signal, by using something like request_animation_frame, which will
-// set a short timeout and then update the signal before the next frame.
-
-/*
-  create_effect(cx, move |_| {
-    // do something like reading from localStorage
-    request_animation_frame(move || set_loaded(true));
-  });
-*/
-
-// This allows the browser to hydrate with the correct, matching state
-// (loaded is false when it reaches the view), then immediately update
-// it to true once hydration is complete.
+// It’s fine! This will render appropriately on the server, ignoring
+// the client-only code, and then access the storage and log a message
+// on the browser.
 
 // See src/app.rs for demonstration of this error
 // ----------------------------------------------
