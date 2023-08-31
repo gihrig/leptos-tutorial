@@ -1,50 +1,95 @@
-/* 13.1.0 Working with the Server - Server Functions */
+/* 13.1.1 Working with the Server - Using Server Functions */
 
-// If you’re creating anything beyond a toy app, you’ll need to run
-// code on the server all the time: reading from or writing to a
-// database that only runs on the server, running expensive
-// computations using libraries you don’t want to ship down to the
-// client, accessing APIs that need to be called from the server
-// rather than the client for CORS reasons or because you need a
-// secret API key that’s stored on the server and definitely
-// shouldn’t be shipped down to a user’s browser.
+// Actually, I kind of like that todo example. What would it look like?
+// It’s pretty simple, actually.
 
-// Traditionally, this is done by separating your server and client
-// code, and by setting up something like a REST API or GraphQL API
-// to allow your client to fetch and mutate data on the server. This
-// is fine, but it requires you to write and maintain your code in
-// multiple separate places (client-side code for fetching, server-side
-// functions to run), as well as creating a third thing to manage,
-// which is the API contract between the two.
+// todo.rs
+/*
+  #[server(AddTodo, "/api")]
+  pub async fn add_todo(title: String) -> Result<(), ServerFnError> {
+    let mut conn = db().await?;
 
-// Leptos is one of a number of modern frameworks that introduce the
-// concept of server functions. Server functions have two key
-// characteristics:
+    match sqlx::query("INSERT INTO todos (title, completed) VALUES ($1, false)")
+    .bind(title)
+    .execute(&mut conn)
+    .await
+    {
+      Ok(_row) => Ok(()),
+      Err(e) => Err(ServerFnError::ServerError(e.to_string())),
+      }
+  }
 
-// 1. Server functions are co-located with your component code, so that
-//    you can organize your work by feature, not by technology. For
-//    example, you might have a “dark mode” feature that should persist
-//    a user’s dark/light mode preference across sessions, and be
-//    applied during server rendering so there’s no flicker. This
-//    requires a component that needs to be interactive on the client,
-//    and some work to be done on the server (setting a cookie, maybe
-//    even storing a user in a database.) Traditionally, this feature
-//    might end up being split between two different locations in your
-//    code, one in your “frontend” and one in your “backend.” With
-//    server functions, you’ll probably just write them both in one
-//    dark_mode.rs and forget about it.
-// 2. Server functions are isomorphic, i.e., they can be called either
-//    from the server or the browser. This is done by generating code
-//    differently for the two platforms. On the server, a server
-//    function simply runs. In the browser, the server function’s body
-//    is replaced with a stub that actually makes a fetch request to
-//    the server, serializing the arguments into the request and
-//    deserializing the return value from the response. But on either
-//    end, the function can simply be called: you can create an add_todo
-//    function that writes to your database, and simply call it from a
-//    click handler on a button in the browser!
+  #[component]
+  pub fn BusyButton(cx: Scope) -> impl IntoView {
+    view! {
+      cx,
+      <button on:click=move |_| {
+        spawn_local(async {
+          add_todo("So much to do!".to_string()).await;
+        });
+      }>
+      "Add Todo"
+      </button>
+      }
+  }
+*/
 
-// Example app not used in this chapter.
+// You’ll notice a few things here right away:
+
+// 1. Server functions can use server-only dependencies, like sqlx, and
+//    can access server-only resources, like our database.
+// 2. Server functions are async. Even if they only did synchronous work
+//    on the server, the function signature would still need to be async,
+//    because calling them from the browser must be asynchronous.
+// 3. Server functions return Result<T, ServerFnError>. Again, even if
+//    they only do infallible work on the server, this is true, because
+//    ServerFnError’s variants include the various things that can be
+//    wrong during the process of making a  network request.
+// 4. Server functions can be called from the client. Take a look at our
+//    click handler. This is code that will only ever run on the client.
+//    But it can call the function add_todo (using spawn_local to run
+//    the Future) as if it were an ordinary async function:
+
+/*
+        move |_| {
+          spawn_local(async {
+            add_todo("So much to do!".to_string()).await;
+          });
+        }
+*/
+
+// 5. Server functions are top-level functions defined with fn. Unlike
+//    event listeners, derived signals, and most everything else in
+//    Leptos, they are not closures! As fn calls, they have no access to
+//    the reactive state of your app or anything else that is not passed
+//    in as an argument. And again, this makes perfect sense: When you
+//    make a request to the server, the server doesn’t have access to
+//    client state unless you send it explicitly. (Otherwise we’d have
+//    to serialize the whole reactive system and send it across the wire
+//    with every request, which—while it served classic ASP for a while—
+//    is a really bad idea.)
+// 6. Server function arguments and return values both need to be
+
+// There are a few things to note about the way you define a server
+// function, too.
+
+// 1. Server functions are created by using the #[server] macro to
+//    annotate a top-level function, which can be defined anywhere.
+//    https://docs.rs/leptos_server/latest/leptos_server/index.html#server
+// 2. We provide the macro a `type name`. The type name is used
+//    internally as a container to hold, serialize, and deserialize
+//    the arguments.
+// 3. We provide the macro a path. This is a prefix for the path at
+//    which we’ll mount a server function handler on our server. See
+//    examples:
+//    Actix: https://github.com/leptos-rs/leptos/blob/main/examples/todo_app_sqlite/src/main.rs#L44
+//    Axum:  https://github.com/leptos-rs/leptos/blob/main/examples/todo_app_sqlite_axum/src/main.rs#L55
+// 4. You’ll need to have serde as a dependency with the derive
+//    feature enabled for the macro to work properly. You can easily
+//    add it to Cargo.toml with cargo add serde --features=derive.
+
+// See /src/todo.rs for an example of a server function.
+// Not used, unable to make work for too many reasons
 // --------------------------------------------------------
 
 #[cfg(feature = "ssr")]

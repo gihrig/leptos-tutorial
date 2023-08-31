@@ -1083,6 +1083,7 @@ dependencies = [
  "leptos_meta",
  "leptos_router",
  "log",
+ "serde",
  "simple_logger",
  "thiserror",
  "tokio",
