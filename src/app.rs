@@ -1,3 +1,4 @@
+use crate::todo::*;
 use leptos::*;
 
 // Demonstrate Client Code Can't Run on Server error
@@ -6,6 +7,7 @@ pub fn App(cx: Scope) -> impl IntoView {
     view! { cx,
       <h1>"Hello, World, it works!"</h1>
       <h2>"This code is from src/app.rs"</h2>
+      <BusyButton/>
     }
 }
 
@@ -19,5 +21,6 @@ fn HomePage(cx: Scope) -> impl IntoView {
     view! { cx,
         <h1>"Welcome to Leptos!"</h1>
         <button on:click=on_click>"Click Me: " {count}</button>
+        <BusyButton/>
     }
 }

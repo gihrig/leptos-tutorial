@@ -1,7 +1,10 @@
 // todo.rs
 
+use leptos::*;
+
 #[server(AddTodo, "/api")]
 pub async fn add_todo(title: String) -> Result<(), ServerFnError> {
+    println!("add todo: {}", title);
     let mut conn = db().await?;
 
     match sqlx::query("INSERT INTO todos (title, completed) VALUES ($1, false)")
@@ -14,6 +17,7 @@ pub async fn add_todo(title: String) -> Result<(), ServerFnError> {
     }
 }
 
+#[allow(unused_must_use)]
 #[component]
 pub fn BusyButton(cx: Scope) -> impl IntoView {
     view! {

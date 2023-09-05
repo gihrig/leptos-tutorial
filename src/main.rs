@@ -89,9 +89,7 @@
 //    add it to Cargo.toml with cargo add serde --features=derive.
 
 // See /src/todo.rs for an example of a server function.
-// Not used, unable to make work for too many reasons
 // --------------------------------------------------------
-
 #[cfg(feature = "ssr")]
 #[tokio::main]
 async fn main() {

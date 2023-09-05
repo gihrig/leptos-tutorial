@@ -9,6 +9,7 @@ crate-type = ["cdylib", "rlib"]
 [package.metadata.x]
 ls = "ls -alh"
 dev = "cargo leptos watch --hot-reload"
+build = "cargo leptos build --release"
 style = "npx tailwindcss -i ./input.css -o ./style/output.css --watch"
 
 [dependencies]
@@ -25,6 +26,7 @@ leptos_router = { version = "0.4.10", features = ["nightly"] }
 log = "0.4"
 serde = { version = "1.0.188", features = ["derive"] }
 simple_logger = "4"
+sqlx = "0.7.1"
 thiserror = "1.0.38"
 tokio = { version = "1.25.0", optional = true }
 tower = { version = "0.4.13", optional = true }
